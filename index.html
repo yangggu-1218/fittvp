@@ -1,0 +1,1137 @@
+<title>FITT-VP 처방 시뮬레이터</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: 폰 프레임 안의 온보딩 퀴즈(질문 1개/화면, 방향성 슬라이드) → 결과 5탭. 모든 그림은 코드로 그린 관절 일러스트가 실제로 운동 동작을 반복. 발표 덱의 회색 종이 + 진홍 체크 모티프 */
+:root {
+  --paper: #DEDADA;
+  --screen: #F6F4F4;
+  --card: #FFFFFF;
+  --ink: #1C1919;
+  --muted: #625B5B;
+  --line: #DAD4D4;
+  --red: #A3131F;
+  --red-soft: #F6E3E4;
+  --good: #2D7A4D;
+  --good-soft: #E2F0E7;
+  --warn: #9A6412;
+  --warn-soft: #FAEFD9;
+  --on-red: #FFFFFF;
+  --fig-far: #BDB4B4;
+  --prop: #8E8686;
+  --zone1: #ECE8E8;
+  --zone2: #E1DADA;
+  --zone3: #F2CFD2;
+  --zone4: #E5A9AE;
+  --font-display: "Black Han Sans", "Noto Sans KR", "Malgun Gothic", sans-serif;
+  --font-body: "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0C0B0B; --screen: #171414; --card: #221E1E; --ink: #F2EEEE; --muted: #B4ABAB; --line: #3A3333;
+    --red: #E2525C; --red-soft: #3B1E21; --good: #6CC793; --good-soft: #1B3226; --warn: #E5B25A; --warn-soft: #3A2D16; --on-red: #161414;
+    --fig-far: #5E5555; --prop: #8A8080; --zone1: #2A2525; --zone2: #332C2C; --zone3: #4A2529; --zone4: #6B2E34; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0C0B0B; --screen: #171414; --card: #221E1E; --ink: #F2EEEE; --muted: #B4ABAB; --line: #3A3333;
+  --red: #E2525C; --red-soft: #3B1E21; --good: #6CC793; --good-soft: #1B3226; --warn: #E5B25A; --warn-soft: #3A2D16; --on-red: #161414;
+  --fig-far: #5E5555; --prop: #8A8080; --zone1: #2A2525; --zone2: #332C2C; --zone3: #4A2529; --zone4: #6B2E34; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px;
+  display: grid; place-items: center;
+  background-image: repeating-conic-gradient(color-mix(in srgb, var(--ink) 4%, transparent) 0 25%, transparent 0 50%); background-size: 48px 48px;
+}
+.phone {
+  width: 100%; max-width: 430px; height: min(900px, 100%); min-height: 600px; background: var(--screen); border: 2px solid var(--ink);
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; position: relative; box-shadow: 10px 10px 0 color-mix(in srgb, var(--red) 85%, transparent);
+}
+@media (max-width: 480px) { body { padding: 0; background-image: none; } .phone { border: 0; height: 100%; max-width: none; box-shadow: none; } }
+
+/* figures */
+.fig { display: block; }
+.fig path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.fig .fr { stroke: var(--fig-far); stroke-width: 4.5; }
+.fig .nr { stroke: var(--ink); stroke-width: 5; }
+.fig .hl { stroke: var(--red); stroke-width: 5; }
+.fig .tor { stroke: var(--ink); stroke-width: 6.5; }
+.fig .hlt { stroke: var(--red); stroke-width: 6.5; }
+.fig .hd { fill: var(--ink); }
+.fig .pr { stroke: var(--prop); stroke-width: 2.2; }
+.fig .pa { stroke: var(--ink); stroke-width: 2.6; }
+.fig .gr { stroke: var(--line); stroke-width: 2; }
+.fig .pf { fill: var(--prop); }
+.fig .bd { stroke: var(--red); stroke-width: 1.8; }
+.fig .wv { stroke: var(--prop); stroke-width: 2; }
+.fig .pulse { fill: none; stroke: var(--red); stroke-width: 1.5; }
+.ic { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* top bar */
+.bar { display: grid; grid-template-columns: 44px minmax(0, 1fr) 76px; align-items: center; gap: 8px; padding: 12px 14px 8px; }
+.bar > button[hidden] { display: block !important; visibility: hidden; }
+.iconbtn { width: 36px; height: 36px; border: 0; background: transparent; color: var(--ink); cursor: pointer; display: grid; place-items: center; }
+.prog { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 3px; }
+.prog i { height: 4px; background: var(--line); position: relative; overflow: hidden; }
+.prog i::after { content: ""; position: absolute; inset: 0; background: var(--red); transform: scaleX(0); transform-origin: left; transition: transform .35s ease; }
+.prog i.on::after { transform: scaleX(1); }
+.skip { font: inherit; font-size: 13px; color: var(--muted); background: none; border: 0; cursor: pointer; text-align: right; }
+.apptitle { font-family: var(--font-display); font-size: 18px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.apptitle span { color: var(--red); }
+
+.body { overflow-y: auto; overflow-x: hidden; padding: 6px 20px 20px; position: relative; scroll-behavior: smooth; }
+.scr { display: grid; gap: 14px; }
+.scr.in-r { animation: inR .34s cubic-bezier(.2, .8, .2, 1); }
+.scr.in-l { animation: inL .34s cubic-bezier(.2, .8, .2, 1); }
+.scr.fade { animation: fade .28s ease; }
+@keyframes inR { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+@keyframes inL { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
+@keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.rise > * { animation: fade .4s ease backwards; }
+.rise > *:nth-child(2) { animation-delay: .05s; } .rise > *:nth-child(3) { animation-delay: .1s; } .rise > *:nth-child(4) { animation-delay: .15s; }
+.rise > *:nth-child(5) { animation-delay: .2s; } .rise > *:nth-child(6) { animation-delay: .25s; } .rise > *:nth-child(n+7) { animation-delay: .3s; }
+
+.qhead { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; }
+.step { font-family: var(--font-num); font-size: 12px; color: var(--red); letter-spacing: .06em; }
+.scr h2 { font-family: var(--font-display); font-weight: 400; font-size: 26px; line-height: 1.22; margin: 2px 0 0; text-wrap: balance; }
+.scr h2:focus { outline: none; }
+.lead { margin: -6px 0 0; color: var(--muted); font-size: 14px; }
+.qhead .fig { width: 84px; height: 84px; margin-bottom: -6px; }
+
+/* option cards */
+.opts { display: grid; gap: 10px; }
+.opts.g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.opts.g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.opt {
+  font: inherit; text-align: left; background: var(--card); color: var(--ink); border: 1.5px solid var(--line); padding: 14px; cursor: pointer;
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: center; position: relative; min-width: 0;
+  transition: border-color .15s, background-color .15s, transform .12s;
+}
+.opt:active { transform: scale(.97); }
+.opts.g2 .opt, .opts.g3 .opt { grid-template-columns: minmax(0, 1fr); gap: 8px; align-content: start; min-height: 100px; }
+.opts.g3 .opt { min-height: 92px; padding: 12px 10px; }
+.mk { width: 44px; height: 44px; display: grid; place-items: center; border: 1.5px solid var(--ink); color: var(--ink); transition: background-color .15s, color .15s; }
+.opt b { display: block; font-size: 15.5px; }
+.opt small { display: block; color: var(--muted); font-size: 13px; margin-top: 1px; }
+.opt[aria-pressed="true"] { border-color: var(--red); background: var(--red-soft); }
+.opt[aria-pressed="true"] .mk { background: var(--red); border-color: var(--red); color: var(--on-red); }
+.opt .chk { position: absolute; top: 8px; right: 9px; width: 20px; height: 20px; border-radius: 50%; background: var(--red); color: var(--on-red); display: grid; place-items: center; transform: scale(0); transition: transform .2s cubic-bezier(.3, 1.6, .5, 1); }
+.opt .chk svg { width: 12px; height: 12px; stroke: currentColor; stroke-width: 3; fill: none; }
+.opt[aria-pressed="true"] .chk { transform: scale(1); }
+.preset { grid-template-columns: 64px minmax(0, 1fr) auto; padding: 8px 12px 8px 8px; }
+.preset .fig { width: 64px; height: 64px; background: var(--screen); }
+.preset .go { color: var(--red); font-size: 20px; }
+:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
+
+/* fields */
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.field { display: grid; gap: 4px; min-width: 0; }
+.field.full { grid-column: 1 / -1; }
+.field label, .lbl { font-size: 13px; color: var(--muted); }
+.unit { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; border: 1.5px solid var(--line); background: var(--card); transition: border-color .15s; }
+.unit:focus-within { border-color: var(--red); }
+.unit input { font: inherit; font-family: var(--font-num); font-size: 20px; font-weight: 600; border: 0; background: transparent; color: var(--ink); padding: 10px 12px; width: 100%; min-width: 0; outline: none; }
+.unit input::-webkit-outer-spin-button, .unit input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.unit input[type=number] { -moz-appearance: textfield; }
+.unit span { padding-right: 12px; color: var(--muted); font-size: 13px; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); border: 1.5px solid var(--ink); background: var(--card); position: relative; }
+.seg button { font: inherit; font-size: 14px; padding: 10px 2px; border: 0; border-left: 1.5px solid var(--ink); background: transparent; color: var(--ink); cursor: pointer; transition: background-color .15s, color .15s; }
+.seg button:first-child { border-left: 0; }
+.seg button[aria-pressed="true"] { background: var(--red); color: var(--on-red); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chips button { font: inherit; font-size: 14px; padding: 8px 12px; border: 1.5px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; transition: all .15s; }
+.chips button[aria-pressed="true"] { border-color: var(--red); background: var(--red-soft); color: var(--red); font-weight: 700; }
+.sub { font-size: 13px; color: var(--muted); font-weight: 700; margin: 2px 0 -6px; }
+details.blood summary { cursor: pointer; font-size: 14px; color: var(--red); font-weight: 700; padding: 6px 0; }
+.note { font-size: 12.5px; color: var(--muted); margin: 0; }
+.live { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: center; border: 1.5px dashed var(--line); padding: 10px 12px; }
+.live .n { font-family: var(--font-num); font-size: 26px; font-weight: 600; color: var(--red); min-width: 3.5ch; }
+.live .t { font-size: 13px; }
+
+/* body map & ecg */
+.bodymap { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 16px; align-items: center; }
+.bodymap svg { width: 150px; height: auto; }
+.bm-body { fill: var(--zone2); }
+.bm-zone { fill: transparent; stroke: var(--red); stroke-width: 1.6; stroke-dasharray: 3 3; cursor: pointer; transition: fill .15s; }
+.bm-zone:hover { fill: var(--red-soft); }
+.bm-zone.on { fill: var(--red); stroke-dasharray: none; animation: throb 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes throb { 50% { transform: scale(1.12); } }
+.bm-list { display: grid; gap: 8px; }
+.ecg { width: 100%; height: 56px; }
+.ecg path { fill: none; stroke: var(--red); stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; stroke-dasharray: 420; animation: ecg 2.2s linear infinite; }
+.ecg .base { stroke: var(--line); stroke-dasharray: none; animation: none; stroke-width: 1.4; }
+@keyframes ecg { from { stroke-dashoffset: 420; } to { stroke-dashoffset: -420; } }
+.weekprev { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.weekprev div { text-align: center; font-size: 12px; padding: 8px 0 6px; border: 1.5px solid var(--line); background: var(--card); color: var(--muted); transition: all .2s; }
+.weekprev div.on { background: var(--red); border-color: var(--red); color: var(--on-red); font-weight: 700; }
+.vol { display: grid; gap: 6px; }
+.vol .row { display: flex; justify-content: space-between; font-size: 13px; }
+.vol .trk { height: 10px; background: var(--line); position: relative; }
+.vol .trk i { position: absolute; inset: 0 auto 0 0; background: var(--red); transition: width .4s ease; }
+.vol .trk b { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); }
+
+/* footer */
+.foot { padding: 12px 20px 16px; padding-bottom: max(16px, env(safe-area-inset-bottom, 0px)); border-top: 1.5px solid var(--line); background: var(--screen); }
+.primary { font: inherit; font-weight: 700; font-size: 16px; width: 100%; padding: 14px; background: var(--red); color: var(--on-red); border: 0; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; transition: transform .12s, opacity .2s; }
+.primary:active { transform: scale(.98); }
+.primary:disabled { opacity: .35; cursor: not-allowed; }
+.secondary { font: inherit; font-size: 14px; width: 100%; padding: 12px; background: transparent; color: var(--ink); border: 1.5px solid var(--ink); cursor: pointer; }
+.why { margin: 0 0 8px; color: var(--red); font-size: 12.5px; }
+.tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 0 0 env(safe-area-inset-bottom, 0px); position: relative; }
+.tab { font: inherit; font-size: 12px; padding: 9px 2px 10px; background: transparent; border: 0; color: var(--muted); cursor: pointer; display: grid; gap: 3px; justify-items: center; }
+.tab .ic { width: 22px; height: 22px; }
+.tab[aria-selected="true"] { color: var(--red); font-weight: 700; }
+.tabs .ind { position: absolute; top: -1.5px; height: 3px; width: 20%; background: var(--red); transition: left .3s cubic-bezier(.2, .8, .2, 1); }
+
+/* welcome */
+.hero { position: relative; display: grid; gap: 12px; }
+.stage { position: relative; height: 210px; border: 2px solid var(--ink); background: var(--card); overflow: hidden; }
+.stage .chk { position: absolute; inset: auto 0 0 0; height: 44px; background: repeating-conic-gradient(var(--red) 0 25%, transparent 0 50%) 0 0 / 22px 22px; opacity: .9; }
+.stage .fig { position: absolute; left: 50%; bottom: 10px; width: 190px; height: 190px; transform: translateX(-50%); }
+.stage .badge { position: absolute; top: 12px; left: 12px; font-family: var(--font-num); font-size: 12px; background: var(--ink); color: var(--screen); padding: 4px 8px; }
+.stage .hrb { position: absolute; top: 12px; right: 12px; display: flex; align-items: center; gap: 6px; font-family: var(--font-num); font-weight: 600; color: var(--red); }
+.stage .hrb .ic { animation: beat 1s ease-in-out infinite; }
+@keyframes beat { 15% { transform: scale(1.25); } 30% { transform: scale(1); } 45% { transform: scale(1.15); } 60% { transform: scale(1); } }
+.hero h1 { font-family: var(--font-display); font-weight: 400; font-size: 38px; line-height: 1.08; margin: 4px 0 0; }
+.hero h1 span { color: var(--red); }
+.hero p { margin: 0; color: var(--muted); }
+.flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; font-size: 12px; text-align: center; }
+.flow div { border: 1.5px solid var(--line); padding: 8px 2px; background: var(--card); display: grid; justify-items: center; gap: 2px; }
+.flow .ic { color: var(--red); width: 20px; height: 20px; }
+
+/* loading */
+.loading { display: grid; justify-items: center; gap: 14px; padding: 24px 0; text-align: center; }
+.loading .fig { width: 170px; height: 170px; }
+.loading h2 { margin: 0; }
+.checks { display: grid; gap: 10px; width: 100%; max-width: 300px; text-align: left; }
+.checks div { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; align-items: center; font-size: 14px; opacity: .25; animation: tick .3s ease forwards; }
+.checks div span { width: 22px; height: 22px; border: 1.5px solid var(--red); display: grid; place-items: center; color: var(--on-red); }
+.checks div span svg { width: 12px; height: 12px; stroke: currentColor; stroke-width: 3; fill: none; }
+.checks div:nth-child(1) { animation-delay: .25s; } .checks div:nth-child(2) { animation-delay: .75s; } .checks div:nth-child(3) { animation-delay: 1.25s; } .checks div:nth-child(4) { animation-delay: 1.7s; }
+@keyframes tick { to { opacity: 1; } }
+.checks div span { animation: fillchk .3s ease forwards; animation-delay: inherit; background: transparent; }
+@keyframes fillchk { to { background: var(--red); } }
+
+/* results */
+.card { background: var(--card); border: 1.5px solid var(--line); padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.card.ink { border: 2px solid var(--ink); }
+.card h3 { margin: 0; font-size: 14px; color: var(--red); display: flex; align-items: center; gap: 6px; }
+.card h3 .ic { width: 18px; height: 18px; }
+.today { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; align-items: center; }
+.today .fig { width: 112px; height: 112px; background: var(--screen); }
+.focus { display: flex; flex-wrap: wrap; gap: 6px; }
+.focus span { border: 1.5px solid var(--red); color: var(--red); padding: 2px 8px; font-size: 12.5px; font-weight: 700; }
+.focus span.env { border-color: var(--line); color: var(--muted); font-weight: 500; }
+.kicker { font-size: 12px; color: var(--muted); }
+.ttl { font-weight: 700; font-size: 17px; line-height: 1.3; }
+.big { font-family: var(--font-num); font-size: 32px; font-weight: 600; color: var(--red); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.big small { font-size: 13px; color: var(--muted); font-weight: 500; }
+.stack { display: flex; height: 26px; border: 1.5px solid var(--ink); overflow: hidden; }
+.stack i { display: grid; place-items: center; font-style: normal; font-size: 11px; font-weight: 700; color: var(--on-red); width: 0; transition: width .6s cubic-bezier(.2, .8, .2, 1); white-space: nowrap; overflow: hidden; }
+.stack .s-warm, .stack .s-cool { background: var(--fig-far); color: var(--ink); }
+.stack .s-aero { background: var(--red); }
+.stack .s-res { background: var(--ink); color: var(--screen); }
+.stack .s-iso { background: var(--warn); }
+.stack .s-bal { background: var(--good); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 9px; height: 9px; margin-right: 5px; vertical-align: -1px; background: var(--c); }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.stat { border: 1.5px solid var(--line); padding: 10px 8px; background: var(--card); min-width: 0; }
+.stat .k { font-size: 11.5px; color: var(--muted); }
+.stat .n { font-family: var(--font-num); font-size: 24px; font-weight: 600; color: var(--red); line-height: 1.15; font-variant-numeric: tabular-nums; }
+.stat .n small { font-size: 12px; color: var(--muted); }
+.stat .t { font-size: 12px; font-weight: 700; }
+.meter5 { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; margin-top: 4px; }
+.meter5 i { height: 5px; background: var(--line); }
+.meter5 i.on { background: var(--red); }
+.meter5 i.u { background: repeating-linear-gradient(45deg, var(--line) 0 2px, transparent 2px 4px); }
+details.card summary { cursor: pointer; font-weight: 700; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+details.card summary::-webkit-details-marker { display: none; }
+details.card summary::after { content: "+"; font-family: var(--font-num); color: var(--red); font-size: 18px; }
+details.card[open] summary::after { content: "−"; }
+ul.rf { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; font-size: 13px; }
+ul.rf li { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 8px; align-items: baseline; }
+.tag { font-size: 11px; font-weight: 700; text-align: center; padding: 1px 0; border: 1.5px solid; }
+.tag.y { color: var(--red); border-color: var(--red); } .tag.n { color: var(--muted); border-color: var(--line); }
+.tag.p { color: var(--good); border-color: var(--good); } .tag.u { color: var(--warn); border-color: var(--warn); }
+.chg { display: grid; gap: 8px; }
+.chg .r { display: grid; grid-template-columns: 74px minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 13px; }
+.chg .r b { font-weight: 500; color: var(--muted); }
+.chg .trk { height: 8px; background: var(--line); position: relative; }
+.chg .trk i { position: absolute; inset: 0 auto 0 0; background: var(--good); width: 0; transition: width .8s cubic-bezier(.2, .8, .2, 1); }
+.chg .v { font-family: var(--font-num); font-weight: 600; font-size: 13px; white-space: nowrap; }
+.answers { display: grid; }
+.ans { font: inherit; color: var(--ink); background: transparent; border: 0; border-top: 1px solid var(--line); text-align: left; padding: 9px 0; cursor: pointer; display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 14px; }
+.ans:first-child { border-top: 0; }
+.ans span:first-child { color: var(--muted); font-size: 13px; }
+.ans .go { color: var(--red); }
+.zone { display: grid; gap: 6px; }
+.zbar { position: relative; height: 34px; display: flex; border: 1.5px solid var(--ink); }
+.zbar > span { height: 100%; }
+.zbar .tgt { position: absolute; top: -6px; bottom: -6px; border: 2.5px solid var(--red); background: color-mix(in srgb, var(--red) 18%, transparent); transition: left .7s cubic-bezier(.2, .8, .2, 1), width .7s cubic-bezier(.2, .8, .2, 1); }
+.zlbl { position: relative; height: 18px; font-family: var(--font-num); font-size: 12px; }
+.zlbl span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.zlbl span.l0 { transform: none; } .zlbl span.l1 { transform: translateX(-100%); }
+.zlbl span.hot { color: var(--red); font-weight: 600; }
+.rpe { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); gap: 2px; }
+.rpe i { font-style: normal; font-family: var(--font-num); font-size: 11px; text-align: center; padding: 10px 0 4px; background: var(--line); color: var(--muted); position: relative; transition: background-color .3s, color .3s; }
+.rpe i.on { background: var(--red); color: var(--on-red); font-weight: 600; }
+.rpe i::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: var(--h); background: var(--zone2); }
+.rpe i.on::before { background: var(--red); opacity: .35; }
+.rpewords { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+.mrow { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 12px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
+.mrow:first-of-type { border-top: 0; }
+.mrow .fig { width: 64px; height: 64px; background: var(--screen); }
+.mrow b { display: block; }
+.mrow span { font-family: var(--font-num); font-size: 13px; color: var(--red); font-weight: 600; }
+.formula { font-family: var(--font-num); font-size: 12px; color: var(--muted); overflow-wrap: anywhere; background: var(--screen); padding: 8px 10px; }
+.kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; font-size: 14px; margin: 0; }
+.kv dt { color: var(--muted); } .kv dd { margin: 0; font-family: var(--font-num); font-weight: 600; text-align: right; }
+.fittsel { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.fittsel button, .daychip { font: inherit; font-size: 13px; flex: none; padding: 7px 11px; border: 1.5px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; transition: all .15s; }
+.fittsel button[aria-pressed="true"], .daychip[aria-pressed="true"] { border-color: var(--red); background: var(--red); color: var(--on-red); }
+.fhead { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; align-items: center; }
+.fhead .fig { width: 96px; height: 96px; background: var(--screen); }
+.fittrow { display: grid; grid-template-columns: 30px 48px minmax(0, 1fr); gap: 8px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; align-items: baseline; }
+.fittrow b { font-family: var(--font-display); font-weight: 400; color: var(--red); font-size: 20px; line-height: 1; }
+.fittrow span.k { color: var(--muted); font-size: 12.5px; }
+.phases { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border: 1.5px solid var(--line); }
+.phasebtn { font: inherit; color: var(--ink); background: var(--card); border: 0; border-left: 1.5px solid var(--line); text-align: left; padding: 10px; cursor: pointer; display: grid; gap: 2px; align-content: start; }
+.phasebtn:first-child { border-left: 0; }
+.phasebtn b { font-family: var(--font-num); font-size: 13px; }
+.phasebtn small { font-size: 12px; color: var(--muted); line-height: 1.35; }
+.phasebtn[aria-pressed="true"] { background: var(--red-soft); box-shadow: inset 0 -3px 0 var(--red); }
+.phasebtn[aria-pressed="true"] b { color: var(--red); }
+.days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.daychip { padding: 7px 0; text-align: center; display: grid; gap: 1px; }
+.daychip small { font-size: 10px; opacity: .85; }
+.daychip:disabled { color: var(--muted); background: transparent; cursor: default; }
+.tl { display: grid; grid-template-columns: 50px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.tl:first-child { border-top: 0; }
+.tl .m { font-family: var(--font-num); font-weight: 600; color: var(--red); }
+.tl small { display: block; color: var(--muted); font-size: 12.5px; }
+.goal { display: grid; gap: 4px; }
+.goal .row { display: flex; justify-content: space-between; font-size: 13px; gap: 8px; }
+.goal .trk { height: 8px; background: var(--line); position: relative; overflow: hidden; }
+.goal .trk i { position: absolute; inset: 0 auto 0 0; background: var(--red); width: 0; transition: width .8s cubic-bezier(.2, .8, .2, 1); }
+.goal.ok .trk i { background: var(--good); }
+.ex { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); align-items: center; }
+.ex:first-of-type { border-top: 0; }
+.ex .fig { width: 58px; height: 58px; background: var(--screen); }
+.ex .top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.ex b { font-size: 15px; }
+.ex .dose { font-family: var(--font-num); font-size: 12.5px; color: var(--red); font-weight: 600; white-space: nowrap; }
+.ex small { display: block; color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.ex .why { color: var(--warn); }
+.cgroup ul { margin: 0; padding-left: 18px; display: grid; gap: 5px; font-size: 14px; }
+.cgroup.stop { border-color: var(--red); background: var(--red-soft); }
+.cgroup.stop h3 { animation: blink 1.6s ease-in-out infinite; }
+@keyframes blink { 50% { opacity: .55; } }
+.disc { font-size: 11.5px; color: var(--muted); margin: 0; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .checks div { opacity: 1; } .checks div span { background: var(--red); }
+}
+</style>
+
+<div class="phone" id="app">
+  <div class="bar">
+    <button class="iconbtn" id="back" aria-label="이전" hidden><svg class="ic" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <div id="barMid"></div>
+    <button class="skip" id="skip" hidden>건너뛰기</button>
+  </div>
+  <main class="body" id="body"></main>
+  <div class="foot" id="foot"></div>
+</div>
+
+<script>
+// ---------- animated exercise figures (side view, 100x100) ----------
+const FIG = (() => {
+  const P = (x, y) => ({ x, y });
+  const Lp = (a, b, e) => P(a.x + (b.x - a.x) * e, a.y + (b.y - a.y) * e);
+  const add = (a, dx, dy) => P(a.x + dx, a.y + dy);
+  const osc = (t) => 0.5 - 0.5 * Math.cos(2 * Math.PI * t);
+  const f = (n) => n.toFixed(1);
+  function ik(a, t, l1, l2, pr) {
+    const dx = t.x - a.x, dy = t.y - a.y, d = Math.hypot(dx, dy) || 0.01;
+    const dc = Math.min(Math.max(d, Math.abs(l1 - l2) + 0.5), l1 + l2 - 0.2);
+    const ux = dx / d, uy = dy / d, end = P(a.x + ux * dc, a.y + uy * dc);
+    const base = Math.atan2(uy, ux), c = (l1 * l1 + dc * dc - l2 * l2) / (2 * l1 * dc), al = Math.acos(Math.max(-1, Math.min(1, c)));
+    const j1 = P(a.x + l1 * Math.cos(base + al), a.y + l1 * Math.sin(base + al));
+    const j2 = P(a.x + l1 * Math.cos(base - al), a.y + l1 * Math.sin(base - al));
+    const mx = (a.x + end.x) / 2, my = (a.y + end.y) / 2;
+    const sc = (j) => (j.x - mx) * pr[0] + (j.y - my) * pr[1];
+    return { j: sc(j1) >= sc(j2) ? j1 : j2, end };
+  }
+  function draw(p) {
+    const ux = p.neck.x - p.hip.x, uy = p.neck.y - p.hip.y, ul = Math.hypot(ux, uy) || 1;
+    const head = P(p.neck.x + (ux / ul) * 8, p.neck.y + (uy / ul) * 8);
+    const sh = P(p.neck.x - (ux / ul) * 2, p.neck.y - (uy / ul) * 2);
+    const kp = p.kp || [1, 0], ep = p.ep || [-1, 0.3], hl = p.hl || "";
+    const limb = (a, t, l1, l2, pr, cls) => { const r = ik(a, t, l1, l2, pr); return { s: `<path class="${cls}" d="M${f(a.x)} ${f(a.y)}L${f(r.j.x)} ${f(r.j.y)}L${f(r.end.x)} ${f(r.end.y)}"/>`, end: r.end }; };
+    const cL = hl === "legs" ? "hl" : "nr", cA = hl === "arms" ? "hl" : "nr", cT = hl === "core" ? "hlt" : "tor";
+    const fl = limb(p.hip, p.feet[1], 15, 15, kp, "fr"), fa = limb(sh, p.hands[1], 11, 11, ep, "fr");
+    const nl = limb(p.hip, p.feet[0], 15, 15, kp, cL), na = limb(sh, p.hands[0], 11, 11, ep, cA);
+    const toe = (e, cls) => p.toe ? `<path class="${cls}" d="M${f(e.x)} ${f(e.y)}l${p.toe[0]} ${p.toe[1]}"/>` : "";
+    return (p.back || "") + fl.s + toe(fl.end, "fr") + fa.s +
+      `<path class="${cT}" d="M${f(p.hip.x)} ${f(p.hip.y)}L${f(p.neck.x)} ${f(p.neck.y)}"/>` +
+      nl.s + toe(nl.end, cL) + `<circle class="hd" cx="${f(head.x)}" cy="${f(head.y)}" r="6"/>` + na.s + (p.front || "");
+  }
+  const G = `<path class="gr" d="M6 86.5H94"/>`;
+  const dumb = (h, v) => v
+    ? `<g class="pf"><rect x="${f(h.x - 1.4)}" y="${f(h.y - 6)}" width="2.8" height="12" rx="1"/><rect x="${f(h.x - 3.2)}" y="${f(h.y - 7)}" width="6.4" height="2.6" rx="0.8"/><rect x="${f(h.x - 3.2)}" y="${f(h.y + 4.4)}" width="6.4" height="2.6" rx="0.8"/></g>`
+    : `<g class="pf"><rect x="${f(h.x - 6)}" y="${f(h.y - 1.2)}" width="12" height="2.4" rx="1"/><rect x="${f(h.x - 7)}" y="${f(h.y - 3.2)}" width="2.6" height="6.4" rx="0.8"/><rect x="${f(h.x + 4.4)}" y="${f(h.y - 3.2)}" width="2.6" height="6.4" rx="0.8"/></g>`;
+  const dash = (t) => `<path class="gr" stroke-dasharray="4 9" stroke-dashoffset="${f(t * 26)}" d="M6 91H94"/>`;
+  const stand = (hip = P(50, 55.5), neck = P(51, 31.5)) => ({ hip, neck });
+
+  const T = {
+    walkT: { per: 1.15, cue: "팔을 자연스럽게 흔들고 손잡이에 기대지 않기", f: (t) => {
+      const s = 2 * Math.PI * t, sn = Math.sin(s), cs = Math.cos(s), hip = P(48, 56.5 - 1.5 * Math.abs(cs)), neck = add(hip, 3, -24);
+      return { hip, neck, feet: [P(49 + 9 * sn, 85 - Math.max(0, cs) * 5), P(49 - 9 * sn, 85 - Math.max(0, -cs) * 5)], hands: [add(neck, -8 * sn, 20), add(neck, 8 * sn, 20)], kp: [1, 0], ep: [-1, 0.2], hl: "legs", toe: [4, 0],
+        back: `<path class="pr" d="M16 87H80"/><path class="gr" stroke-dasharray="3 6" stroke-dashoffset="${f(t * 27)}" d="M18 89.5H78"/><path class="pr" d="M16 92H80M80 87L74 44H64"/>` };
+    } },
+    walkO: { per: 1.15, cue: "대화는 되고 노래는 어려운 속도로", f: (t) => {
+      const r = T.walkT.f(t); r.back = G + dash(t); return r;
+    } },
+    march: { per: 1.0, cue: "무릎을 골반 높이 가까이 들기", f: (t) => {
+      const s = 2 * Math.PI * t, a = Math.max(0, Math.sin(s)), b = Math.max(0, -Math.sin(s));
+      return { ...stand(), feet: [P(51 + 6 * a, 85 - 13 * a), P(49 + 6 * b, 85 - 13 * b)], hands: [P(51 - 8 * Math.sin(s), 51), P(51 + 8 * Math.sin(s), 51)], kp: [1, 0], ep: [-1, 0.2], hl: "legs", toe: [4, 0], back: G };
+    } },
+    bike: { per: 1.0, cue: "무릎이 다 펴지기 직전까지 오도록 안장 높이 맞추기", f: (t) => {
+      const s = 2 * Math.PI * t, c = P(57, 73), r = 8;
+      return { hip: P(44, 52), neck: P(57, 31), feet: [P(c.x + r * Math.cos(s), c.y + r * Math.sin(s)), P(c.x - r * Math.cos(s), c.y - r * Math.sin(s))], hands: [P(71, 42), P(70, 43)], kp: [1, -0.5], ep: [-0.2, 1], hl: "legs",
+        back: `<circle class="pr" cx="77" cy="73" r="10"/><circle class="gr" cx="57" cy="73" r="8"/><path class="pr" d="M37 52H50M44 53L50 74L77 73M73 43L77 73M68 43H77M30 86.5H88M50 74L44 86M77 73L82 86"/>` };
+    } },
+    swim: { per: 1.5, cue: "물속에선 심박수가 낮게 나오니 숨찬 정도로 조절", f: (t) => {
+      const s = 2 * Math.PI * t; let w = "M0 45";
+      for (let x = 0; x <= 100; x += 5) w += `L${x} ${f(44 + 1.6 * Math.sin(x / 7 + s * 2))}`;
+      return { hip: P(40, 52), neck: P(64, 50), feet: [P(13, 53 + 4 * Math.sin(s * 3)), P(13, 53 - 4 * Math.sin(s * 3))], hands: [P(62 + 19 * Math.cos(s), 50 + 12 * Math.sin(s)), P(62 - 19 * Math.cos(s), 50 - 12 * Math.sin(s))], kp: [0, 1], ep: [0, -1], hl: "arms",
+        back: `<path class="wv" d="${w}"/><path class="gr" d="M6 70H94"/>` };
+    } },
+    squatA: { per: 2.8, cue: "엉덩이를 뒤로 빼며 의자에 앉듯 내려가기", f: (t) => {
+      const e = osc(t), hip = Lp(P(50, 55.5), P(40, 68), e), neck = Lp(P(51, 31.5), P(52, 47), e), h = Lp(add(neck, 3, 20), add(neck, 19, 3), e);
+      return { hip, neck, feet: [P(54, 85), P(52, 85)], hands: [h, add(h, -1, 1)], kp: [1, 0], ep: [-1, 0.4], hl: "legs", toe: [4, 0], back: G };
+    } },
+    squatG: { per: 2.8, cue: "덤벨을 가슴에 붙이고 가슴을 편 채 앉기", f: (t) => {
+      const e = osc(t), hip = Lp(P(50, 55.5), P(40, 68), e), neck = Lp(P(51, 31.5), P(52, 47), e), h = add(neck, 7, 10);
+      return { hip, neck, feet: [P(54, 85), P(52, 85)], hands: [h, add(h, -1, 1)], kp: [1, 0], ep: [-1, 0.6], hl: "legs", toe: [4, 0], back: G, front: dumb(add(h, 2, 0), true) };
+    } },
+    squatC: { per: 3.0, cue: "의자에 엉덩이가 닿으면 바로 일어서기 · 통증 없는 범위만", f: (t) => {
+      const e = osc(t), hip = Lp(P(50, 55.5), P(41, 66), e), neck = Lp(P(51, 31.5), P(53, 45), e), h = Lp(add(neck, 3, 20), add(neck, 18, 4), e);
+      return { hip, neck, feet: [P(55, 85), P(53, 85)], hands: [h, add(h, -1, 1)], kp: [1, 0], ep: [-1, 0.4], hl: "legs", toe: [4, 0],
+        back: G + `<path class="pr" d="M24 48V68M24 68H40M26 68V86M38 68V86"/>` };
+    } },
+    legpress: { per: 3.0, cue: "무릎을 완전히 잠그지 말고, 허리를 등받이에 붙이기", f: (t) => {
+      const e = osc(t), ft = Lp(P(52, 53), P(59, 47), e);
+      return { hip: P(36, 66), neck: P(22, 47), feet: [ft, add(ft, -1, 1)], hands: [P(42, 70), P(41, 70)], kp: [-0.4, -1], ep: [0, 1], hl: "legs",
+        back: `<path class="pr" d="M15 43L35 72M30 72H47M45 86L50 72M40 86L90 46"/><path class="pa" d="M${f(ft.x + 1)} ${f(ft.y - 9)}L${f(ft.x + 8)} ${f(ft.y + 6)}"/>` };
+    } },
+    legpressS: { per: 3.0, cue: "무릎 굽힘을 90도 이내로 제한", f: (t) => {
+      const r = T.legpress.f(0.5 + osc(t) * 0.3 - 0.15); return r;
+    } },
+    hinge: { per: 3.2, cue: "허리를 편 채 엉덩이를 뒤로 밀며 숙이기", f: (t) => {
+      const e = osc(t), hip = Lp(P(50, 55.5), P(43, 57.5), e), neck = Lp(P(52, 31.5), P(65, 47), e), h = add(neck, 0, 21);
+      return { hip, neck, feet: [P(51, 85), P(49, 85)], hands: [h, add(h, -1, 0)], kp: [1, 0], ep: [-1, 0], hl: "legs", toe: [4, 0], back: G, front: dumb(h) };
+    } },
+    bridge: { per: 3.0, cue: "엉덩이를 조이며 어깨-골반-무릎이 일직선이 되게", f: (t) => {
+      const e = osc(t), hip = Lp(P(46, 81), P(50, 67), e);
+      return { hip, neck: P(28, 80), feet: [P(64, 85), P(62, 85)], hands: [P(40, 84), P(39, 84)], kp: [0.2, -1], ep: [0, 1], hl: "legs", back: G };
+    } },
+    legcurl: { per: 3.0, cue: "골반을 패드에 붙인 채 천천히 당기기", f: (t) => {
+      const e = osc(t), ft = Lp(P(79, 64), P(70, 48), e);
+      return { hip: P(52, 64), neck: P(28, 62), feet: [ft, add(ft, 0, 1)], hands: [P(20, 68), P(19, 68)], kp: [0, 1], ep: [0, 1], hl: "legs",
+        back: `<path class="pr" d="M14 68H74M20 68V86M68 68V86"/>`, front: `<circle class="pa" cx="${f(ft.x)}" cy="${f(ft.y - 3)}" r="2.6"/>` };
+    } },
+    seatpress: { per: 2.8, cue: "어깨를 끌어내린 채 가슴 높이로 밀기", f: (t) => {
+      const e = osc(t), h = Lp(P(50, 46), P(62, 44), e);
+      return { hip: P(40, 66), neck: P(40, 42), feet: [P(58, 85), P(56, 85)], hands: [h, add(h, -1, 1)], kp: [1, -0.3], ep: [-1, 0.2], hl: "arms", toe: [4, 0],
+        back: `<path class="pr" d="M33 38V68M31 68H48M40 68V86M30 86.5H66"/>`, front: `<path class="pa" d="M${f(h.x)} ${f(h.y - 4)}V${f(h.y + 4)}"/>` };
+    } },
+    seatpressB: { per: 2.8, cue: "밴드를 등 뒤에 걸고 가슴 높이로 밀기", f: (t) => {
+      const r = T.seatpress.f(t), h = r.hands[0]; r.back += `<path class="bd" d="M31 46Q${f((h.x + 31) / 2)} 52 ${f(h.x)} ${f(h.y)}"/>`; r.front = ""; return r;
+    } },
+    floorpress: { per: 2.8, cue: "팔꿈치가 바닥에 닿으면 멈췄다가 밀기", f: (t) => {
+      const e = osc(t), h = Lp(P(30, 70), P(30, 58), e);
+      return { hip: P(52, 80), neck: P(28, 79), feet: [P(66, 85), P(64, 85)], hands: [h, add(h, 1, 0)], kp: [0, -1], ep: [0, 1], hl: "arms", back: G, front: dumb(h) };
+    } },
+    wallpush: { per: 2.6, cue: "몸을 일자로 유지하고 가슴을 벽 가까이", f: (t) => {
+      const e = osc(t), neck = Lp(P(62, 33), P(67, 40), e), ft = P(36, 85), hip = Lp(ft, neck, 0.54);
+      return { hip, neck, feet: [ft, P(38, 85)], hands: [P(78, 38), P(78, 40)], kp: [1, 0], ep: [0, 1], hl: "arms", toe: [4, 0],
+        back: G + `<rect class="pf" x="80" y="10" width="4" height="77"/>` };
+    } },
+    row: { per: 2.8, cue: "가슴을 편 채 팔꿈치를 뒤로 당기기", f: (t) => {
+      const e = osc(t), h = Lp(P(62, 48), P(48, 48), e);
+      return { hip: P(40, 64), neck: P(42, 40), feet: [P(62, 72), P(61, 73)], hands: [h, add(h, -1, 1)], kp: [0.2, -1], ep: [-1, 0], hl: "arms",
+        back: `<path class="pr" d="M34 66H52M43 66V86M30 86.5H90M64 64V82M90 86V44"/><circle class="pr" cx="88" cy="48" r="2.5"/><path class="pa" d="M${f(h.x)} ${f(h.y)}L86 48"/>` };
+    } },
+    rowB: { per: 2.8, cue: "밴드를 발에 걸고 팔꿈치를 뒤로 당기기", f: (t) => {
+      const e = osc(t), h = Lp(P(62, 52), P(48, 50), e);
+      return { hip: P(40, 80), neck: P(43, 56), feet: [P(68, 84), P(67, 84)], hands: [h, add(h, -1, 1)], kp: [0, -1], ep: [-1, 0], hl: "arms",
+        back: G + `<path class="bd" d="M${f(h.x)} ${f(h.y)}L70 82"/>` };
+    } },
+    dbrow: { per: 2.8, cue: "한 손으로 벤치를 짚고 덤벨을 옆구리로 당기기", f: (t) => {
+      const e = osc(t), h = Lp(P(61, 70), P(53, 58), e);
+      return { hip: P(40, 56), neck: P(62, 48), feet: [P(42, 85), P(36, 85)], hands: [h, P(70, 64)], kp: [1, 0], ep: [-0.6, -1], hl: "arms", toe: [4, 0],
+        back: G + `<path class="pr" d="M62 66H88M66 66V86M84 66V86"/>`, front: dumb(h) };
+    } },
+    standpull: { per: 2.8, cue: "팔꿈치를 어깨 높이로 들고 얼굴 쪽으로 당기기", f: (t) => {
+      const e = osc(t), h = Lp(P(70, 36), P(57, 33), e);
+      return { ...stand(P(48, 55.5), P(49, 31.5)), feet: [P(50, 85), P(46, 85)], hands: [h, add(h, -1, 1)], kp: [1, 0], ep: [0, -1], hl: "arms", toe: [4, 0],
+        back: G + `<path class="pr" d="M92 86V14"/><circle class="pr" cx="90" cy="36" r="2.5"/><path class="pa" d="M${f(h.x)} ${f(h.y)}L88 36"/>` };
+    } },
+    standpullB: { per: 2.8, cue: "가슴 높이에서 밴드를 양옆으로 벌리기", f: (t) => {
+      const e = osc(t), h = Lp(P(70, 42), P(57, 40), e);
+      return { ...stand(P(48, 55.5), P(49, 31.5)), feet: [P(50, 85), P(46, 85)], hands: [h, add(h, 2, 1)], kp: [1, 0], ep: [-0.5, 0.5], hl: "arms", toe: [4, 0],
+        back: G, front: `<path class="bd" d="M${f(h.x)} ${f(h.y - 3)}V${f(h.y + 3)}"/>` };
+    } },
+    pulldown: { per: 2.8, cue: "바를 쇄골 쪽으로 당기고 몸을 뒤로 젖히지 않기", f: (t) => {
+      const e = osc(t), h = Lp(P(49, 23), P(52, 38), e);
+      return { hip: P(46, 66), neck: P(46, 42), feet: [P(64, 85), P(62, 85)], hands: [h, add(h, -1, 0)], kp: [1, -0.3], ep: [-0.5, 1], hl: "arms", toe: [4, 0],
+        back: `<path class="pr" d="M38 68H54M46 68V86M30 86.5H72M49 4V${f(h.y)}"/><path class="pa" d="M${f(h.x - 9)} ${f(h.y)}H${f(h.x + 9)}"/>` };
+    } },
+    pullover: { per: 3.0, cue: "팔꿈치를 살짝 굽힌 채 가슴 위로 호를 그리기", f: (t) => {
+      const e = osc(t), h = Lp(P(11, 68), P(32, 47), e);
+      return { hip: P(54, 66), neck: P(30, 64), feet: [P(66, 85), P(64, 85)], hands: [h, add(h, 1, 0)], kp: [1, -0.2], ep: [0, -1], hl: "arms",
+        back: `<path class="pr" d="M18 68H62M24 68V86M56 68V86"/>` + G, front: dumb(h, true) };
+    } },
+    ytraise: { per: 2.8, cue: "엎드려 엄지를 위로 하고 팔을 살짝 들어 버티기", f: (t) => {
+      const e = osc(t), h = Lp(P(22, 84), P(22, 74), e);
+      return { hip: P(62, 81), neck: P(38, 80), feet: [P(86, 84), P(86, 84)], hands: [h, add(h, 1, 0)], kp: [0, 1], ep: [0, -1], hl: "arms", back: G };
+    } },
+    shpress: { per: 2.8, cue: "허리를 등받이에 붙이고 머리 위로 밀기", f: (t) => {
+      const e = osc(t), h = Lp(P(50, 36), P(46, 22), e);
+      return { hip: P(44, 66), neck: P(44, 42), feet: [P(62, 85), P(60, 85)], hands: [h, add(h, -1, 0)], kp: [1, -0.3], ep: [-1, 0.2], hl: "arms", toe: [4, 0],
+        back: `<path class="pr" d="M38 38V68M36 68H52M44 68V86M30 86.5H72"/>`, front: dumb(h) };
+    } },
+    birddog: { per: 3.2, cue: "반대쪽 팔·다리를 뻗고 골반이 돌아가지 않게", f: (t) => {
+      const e = osc(t);
+      return { hip: P(38, 62), neck: P(62, 62), feet: [P(24, 84), Lp(P(24, 84), P(10, 59), e)], hands: [Lp(P(62, 84), P(84, 55), e), P(62, 84)], kp: [0.5, 1], ep: [-1, 0], hl: "core", back: G };
+    } },
+    calfraise: { per: 2.2, cue: "발끝으로 천천히 올라갔다 내려오기 · 벽 짚어도 됨", f: (t) => {
+      const e = osc(t), u = 3.5 * e, ft = (x) => P(x, 85 - u);
+      return { ...stand(P(50, 55.5 - u), P(51, 31.5 - u)), feet: [ft(51), ft(49)], hands: [P(64, 50 - u), P(63, 51 - u)], kp: [1, 0], ep: [-1, 0.5], hl: "legs", toe: [5, f(u * 1)], back: G + `<rect class="pf" x="68" y="18" width="4" height="69"/>` };
+    } },
+    balance: { per: 3.4, cue: "벽이나 의자 가까이에서 한 발로 30초 버티기", f: (t) => {
+      const sw = 1.2 * Math.sin(2 * Math.PI * t), hip = P(50 + sw, 55.5), lift = Lp(P(55, 74), P(54, 70), osc(t));
+      return { hip, neck: add(hip, 1 - sw * 0.6, -24), feet: [lift, P(50, 85)], hands: [P(64, 46), P(36, 46)], kp: [1, 0], ep: [0, 1], hl: "core", toe: [4, 0], back: G };
+    } },
+    wallsit: { per: 3.0, cue: "등을 벽에 붙이고 숨을 참지 않기", f: (t) => {
+      const b = 0.6 * Math.sin(2 * Math.PI * t);
+      return { hip: P(36, 68), neck: P(35, 44 + b), feet: [P(52, 85), P(50, 85)], hands: [P(50, 66), P(49, 67)], kp: [0.3, -1], ep: [0, 1], hl: "legs", toe: [4, 0],
+        back: G + `<rect class="pf" x="26" y="18" width="4" height="69"/>` };
+    } },
+    handgrip: { per: 2.0, cue: "최대 힘의 30%로 2분간 꾸준히 쥐기", f: (t) => {
+      const e = osc(t), h = P(56, 50), g = 7 - 3.5 * e;
+      return { hip: P(42, 66), neck: P(42, 42), feet: [P(60, 85), P(58, 85)], hands: [h, P(52, 64)], kp: [1, -0.3], ep: [0, 1], hl: "arms", toe: [4, 0],
+        back: `<path class="pr" d="M34 68H50M42 68V86M30 86.5H70"/>`,
+        front: `<path class="pa" d="M${f(h.x)} ${f(h.y)}l3 -11M${f(h.x)} ${f(h.y)}l${f(3 + g)} -10"/><circle class="pulse" cx="${f(h.x + 4)}" cy="${f(h.y - 6)}" r="${f(6 + 6 * e)}" style="opacity:${f(0.5 - 0.5 * e)}"/>` };
+    } },
+    stretch: { per: 4.0, cue: "반동 없이 당김이 느껴지는 곳에서 10~30초", f: (t) => {
+      const e = osc(t), neck = Lp(P(44, 57), P(54, 64), e), h = Lp(P(52, 70), P(62, 78), e);
+      return { hip: P(36, 80), neck, feet: [P(65, 84), P(64, 84)], hands: [h, add(h, -1, 1)], kp: [0, -1], ep: [0, 1], hl: "legs", toe: [0, -4], back: G };
+    } },
+  };
+  function svg(id, cls = "", off = 0) {
+    const t = T[id] ? 0.3 + off : 0;
+    return `<svg class="fig ${cls}" viewBox="0 0 100 100" data-fig="${id}" data-off="${off}" aria-hidden="true">${T[id] ? draw(T[id].f(t % 1)) : ""}</svg>`;
+  }
+  let last = 0;
+  const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function loop(now) {
+    if (!reduce() && now - last > 33) {
+      last = now;
+      document.querySelectorAll("svg[data-fig]").forEach((el) => {
+        const tp = T[el.dataset.fig]; if (!tp) return;
+        const t = (now / 1000 / tp.per + (+el.dataset.off || 0)) % 1;
+        el.innerHTML = draw(tp.f(t));
+      });
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+  return { svg, T, cue: (id) => (T[id] ? T[id].cue : "") };
+})();
+
+</script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const r0 = Math.round, r1 = (x) => Math.round(x * 10) / 10;
+  const CHK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
+  // ---------- icons ----------
+  const ICONS = {
+    bp: '<path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20z"/><path d="M4.5 12.5h3.2l1.6-2.6 2.2 5 1.6-2.4h6.4"/>',
+    wt: '<circle cx="10" cy="12" r="6.5"/><circle cx="10" cy="12" r="1.6"/><path d="M16.5 12H21v4h-4.5M18 12v2M20 12v2"/>',
+    glu: '<path d="M12 3s6.5 7.2 6.5 11.3a6.5 6.5 0 0 1-13 0C5.5 10.2 12 3 12 3z"/><path d="M9 15a3 3 0 0 0 3 3"/>',
+    fit: '<circle cx="12" cy="13.5" r="7"/><path d="M12 13.5V9.5M10 3h4M18.2 6.8l1.5-1.5"/>',
+    str: '<path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11"/>',
+    gym: '<path d="M3 21V9.5l9-5.5 9 5.5V21M3 21h18"/><path d="M8 14v4M16 14v4M8 16h8"/>',
+    apt: '<rect x="5" y="3" width="14" height="18"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2M11 21v-3h2v3"/>',
+    home: '<path d="M3 11l9-7 9 7M5 9.5V20h14V9.5M10 20v-6h4v6"/>',
+    outdoor: '<path d="M12 21v-4M6.5 17h11L12 4z"/><path d="M3 21h18"/>',
+    pool: '<path d="M3 16c2-1.6 4-1.6 6 0s4 1.6 6 0 4-1.6 6 0M3 20c2-1.6 4-1.6 6 0s4 1.6 6 0 4-1.6 6 0"/><path d="M8 14V5.5a2 2 0 0 1 4 0M14 14V5.5a2 2 0 0 1 4 0M8 8.5h6M8 11.5h6"/>',
+    tread: '<path d="M3 18h14l3.5-3.5M16.5 14.5L17.5 5H20"/><path d="M5 21h1M15 21h1"/>',
+    bike: '<circle cx="17" cy="16" r="4"/><path d="M5 20h12M8.5 20l2.5-8.5h4M8 8h5M15 11.5l2 4.5"/>',
+    machine: '<path d="M5 3v18M19 3v18M5 6h14M9 10.5h6M9 13.5h6M9 16.5h6"/>',
+    db: '<path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11"/>',
+    band: '<path d="M6 6.5c-4 4 0 12 6 12s9.5-4.5 6-9.5S9.5 3 6 6.5z"/>',
+    grip: '<path d="M8.5 3.5L6.5 20M15.5 3.5l2 16.5M7.5 9c3 2.2 6 2.2 9 0"/>',
+    lvl0: '<path d="M5 19v-2M10 19v-2M15 19v-2M20 19v-2"/>',
+    lvl1: '<path d="M5 19v-5M10 19v-2M15 19v-2M20 19v-2"/><path d="M5 19v-5" stroke-width="3"/>',
+    lvl3: '<path d="M5 19v-5M10 19v-8M15 19v-11M20 19v-14" stroke-width="3"/>',
+    goal: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".8"/>',
+    body: '<circle cx="12" cy="5" r="2.2"/><path d="M12 7.5v7M7 10h10M12 14.5l-3.5 6M12 14.5l3.5 6"/>',
+    place: '<path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
+    rx: '<rect x="5" y="3.5" width="14" height="17"/><path d="M9 8h6M9 12h6M9 16h4"/>',
+    sum: '<circle cx="12" cy="12" r="8"/><path d="M12 7v5l3.5 2"/>',
+    int: '<path d="M3 12h4l2-5 3 10 2.5-7 1.5 2h5"/>',
+    fitt: '<rect x="4" y="4" width="16" height="16"/><path d="M8 9h8M8 13h8M8 17h5"/>',
+    plan: '<rect x="4" y="5" width="16" height="15"/><path d="M4 9.5h16M9 3v4M15 3v4M8 13h2M12 13h2M8 16.5h2"/>',
+    care: '<path d="M12 4l9 16H3z"/><path d="M12 10v4.5M12 17.2v.3"/>',
+    stop: '<path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z"/><path d="M12 8v5M12 16v.4"/>',
+    heart: '<path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20z"/>',
+    joint: '<circle cx="12" cy="12" r="3"/><path d="M12 3v6M12 15v6"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>',
+    edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/>',
+    arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  };
+  const ic = (n, cls = "") => '<svg class="ic ' + cls + '" viewBox="0 0 24 24" aria-hidden="true">' + (ICONS[n] || "") + "</svg>";
+
+  const BLANK = { goals: [], exp: "", wantVig: false, age: "", sex: "M", ht: "", wt: "", waist: "", rhr: "", sbp: "", dbp: "",
+    cond: [], smoke: "never", fpg: "", a1c: "", hdl: "", ldl: "", tg: "", pain: [], place: "", eq: [], days: 3, mins: 30, tod: "am", season: "mild", vo2: "", phase: "init" };
+  const PRESETS = {
+    kim: { label: "발표 페르소나 김OO", sub: "48세 남 · 고혈압 · 아파트 헬스장", fig: "walkT", d: { goals: ["bp", "wt"], exp: "none", wantVig: false, age: 48, sex: "M", ht: 173, wt: 82, waist: 95, rhr: 78, sbp: 142, dbp: 92,
+      cond: ["htn"], smoke: "quitOld", fpg: 108, a1c: 5.9, hdl: 38, ldl: 125, tg: 140, pain: ["back"], place: "apt", eq: ["tread", "bike", "machine", "db"], days: 5, mins: 60, tod: "am", season: "mild", vo2: 28, phase: "init" } },
+    young: { label: "헬스장 다니는 대학생", sub: "23세 여 · 근력·체력 목표", fig: "squatG", d: { goals: ["fit", "str"], exp: "reg", wantVig: true, age: 23, sex: "F", ht: 163, wt: 55, waist: 70, rhr: 66, sbp: 112, dbp: 72,
+      cond: [], smoke: "never", fpg: 88, a1c: 5.1, hdl: 62, ldl: 95, tg: 80, pain: [], place: "gym", eq: ["tread", "bike", "machine", "db", "band"], days: 4, mins: 60, tod: "pm", season: "mild", vo2: 38, phase: "imp" } },
+    senior: { label: "무릎 아픈 당뇨 어르신", sub: "68세 남 · 겨울 · 야외+밴드", fig: "walkO", d: { goals: ["glu", "fit"], exp: "none", wantVig: false, age: 68, sex: "M", ht: 168, wt: 74, waist: 93, rhr: 72, sbp: 134, dbp: 82,
+      cond: ["htn", "dm", "lipid", "bb", "hypo"], smoke: "quitOld", fpg: 142, a1c: 7.1, hdl: 42, ldl: 110, tg: 170, pain: ["knee"], place: "outdoor", eq: ["band"], days: 5, mins: 30, tod: "am", season: "winter", vo2: "", phase: "init" } },
+    home: { label: "재택근무 직장인", sub: "35세 여 · 집 · 장비 없음", fig: "march", d: { goals: ["wt", "fit"], exp: "some", wantVig: false, age: 35, sex: "F", ht: 160, wt: 66, waist: 84, rhr: 74, sbp: 122, dbp: 78,
+      cond: ["fam"], smoke: "never", fpg: 95, a1c: 5.4, hdl: 52, ldl: 118, tg: 120, pain: ["shoulder"], place: "home", eq: [], days: 3, mins: 30, tod: "noon", season: "summer", vo2: "", phase: "init" } },
+  };
+
+  let S = JSON.parse(JSON.stringify(BLANK));
+  let idx = 0, tab = "sum", dayPick = null, fittPick = 0, editing = false, dir = "r";
+
+  // ---------- question screens ----------
+  const Q = [
+    { id: "goal", fig: "walkO", title: "운동으로 가장 바꾸고 싶은 것은?", lead: "여러 개 골라도 됩니다.", valid: () => S.goals.length > 0, why: "하나 이상 골라 주세요",
+      html: () => optGrid("goals", [["bp", "bp", "혈압 관리"], ["wt", "wt", "체중·뱃살 감량"], ["glu", "glu", "혈당 관리"], ["fit", "fit", "체력 향상"], ["str", "str", "근력 향상"]]) },
+    { id: "exp", fig: "bike", title: "최근 3개월, 운동은 얼마나 했나요?", lead: "처방을 시작할 강도를 정합니다.", valid: () => !!S.exp, auto: true,
+      html: () => optList("exp", [["none", "lvl0", "거의 안 했다", "주 1회 미만"], ["some", "lvl1", "가끔 했다", "주 1~2회"], ["reg", "lvl3", "꾸준히 했다", "주 3일 이상, 30분 이상"]]) },
+    { id: "body", fig: "calfraise", title: "기본 정보를 알려 주세요", lead: "강도와 체형 판정에 쓰입니다.",
+      valid: () => +S.age >= 15 && +S.age <= 100 && +S.ht >= 120 && +S.ht <= 220 && +S.wt >= 30 && +S.wt <= 200, why: "나이(15~100세), 키(cm), 체중(kg)을 입력하세요",
+      html: () => '<div class="field full"><span class="lbl">성별</span>' + seg("sex", [["M", "남"], ["F", "여"]]) + "</div>" +
+        '<div class="fields">' + numField("age", "나이", "세") + numField("ht", "키", "cm") + numField("wt", "체중", "kg") + numField("waist", "허리둘레", "cm") + "</div>" +
+        '<div class="live" id="liveBmi">' + bmiLive() + "</div>" },
+    { id: "vital", title: "혈압과 안정시 심박수는?", lead: "모르면 건너뛰어도 됩니다.", valid: () => true, skip: true,
+      html: () => '<svg class="ecg" viewBox="0 0 300 56" aria-hidden="true"><path class="base" d="M0 34H300"/><path d="M0 34H50l6-4 6 4h10l5 8 7-38 7 46 6-16h12l10-6 10 6H160l6-4 6 4h10l5 8 7-38 7 46 6-16h12l10-6 10 6H300"/></svg>' +
+        '<div class="fields">' + numField("sbp", "수축기 혈압", "mmHg") + numField("dbp", "이완기 혈압", "mmHg") + numField("rhr", "안정시 심박수", "bpm", true) + "</div>" +
+        '<p class="note">안정시 심박수는 아침에 일어나 앉은 채로 1분간 잰 맥박입니다.</p>' },
+    { id: "health", title: "해당하는 건강 상태를 골라 주세요", lead: "없으면 다음으로 넘어가세요.", valid: () => true, skip: true,
+      html: () => '<div class="chips">' + [["htn", "고혈압·혈압약"], ["dm", "당뇨병"], ["lipid", "고지혈증 약"], ["bb", "베타차단제"], ["hypo", "인슐린·설폰요소제"], ["fam", "조기 심혈관질환 가족력"]]
+          .map(([v, l]) => chip("cond:" + v, l, S.cond.includes(v))).join("") + "</div>" +
+        '<p class="sub">흡연</p>' + seg("smoke", [["never", "안 함"], ["quitOld", "금연 6개월+"], ["quitRecent", "6개월 내"], ["current", "흡연"]]) +
+        '<details class="blood"' + (S.fpg || S.hdl ? " open" : "") + '><summary>혈액검사 수치 입력 (선택)</summary><div class="fields">' +
+        numField("fpg", "공복혈당", "mg/dL") + numField("a1c", "당화혈색소", "%") + numField("hdl", "HDL", "mg/dL") + numField("ldl", "LDL", "mg/dL") + numField("tg", "중성지방", "mg/dL") + "</div></details>" },
+    { id: "pain", title: "운동할 때 불편한 부위를 눌러 주세요", lead: "그 부위에 부담이 적은 종목으로 바꿔 드립니다.", valid: () => true, skip: true, html: () => bodyMap() },
+    { id: "place", title: "주로 어디서 운동하나요?", lead: "장소에 맞는 운동 형태를 고릅니다.", valid: () => !!S.place, auto: true,
+      html: () => optList("place", [["gym", "gym", "헬스장", "기구가 다양한 곳"], ["apt", "apt", "아파트·회사 헬스장", "기본 기구만 있는 곳"], ["home", "home", "집", "좁은 실내"], ["outdoor", "outdoor", "야외", "공원·산책로·트랙"], ["pool", "pool", "수영장", "수중 걷기·수영"]]) },
+    { id: "eq", title: "쓸 수 있는 장비를 모두 골라 주세요", lead: "없으면 맨몸 운동으로 짭니다.", valid: () => true, skip: true, when: () => S.place !== "pool",
+      html: () => optGrid("eq", [["tread", "tread", "트레드밀"], ["bike", "bike", "실내자전거"], ["machine", "machine", "웨이트 머신"], ["db", "db", "덤벨"], ["band", "band", "탄성밴드"], ["grip", "grip", "핸드그립"]]
+        .filter(([v]) => S.place === "outdoor" ? ["db", "band", "grip"].includes(v) : S.place === "home" ? v !== "machine" : true), 3) },
+    { id: "sched", title: "일주일에 얼마나 운동할 수 있나요?", lead: "가능한 일수와 하루 시간을 정해 주세요.", valid: () => true,
+      html: () => '<p class="sub">주당 일수</p>' + seg("days", [[3, "3일"], [4, "4일"], [5, "5일"], [6, "6일"], [7, "매일"]]) +
+        '<div class="weekprev" id="weekprev">' + weekPrev() + "</div>" +
+        '<p class="sub">하루 시간</p>' + seg("mins", [[20, "20분"], [30, "30분"], [45, "45분"], [60, "60분"], [90, "90분"]]) +
+        '<div class="vol" id="vol">' + volPrev() + "</div>" +
+        '<p class="sub">시간대 · 계절</p>' + seg("tod", [["am", "아침"], ["noon", "점심"], ["pm", "저녁"]]) + seg("season", [["mild", "봄·가을"], ["summer", "여름"], ["winter", "겨울"]]) +
+        '<div class="chips">' + chip("vig", "고강도 운동까지 하고 싶다", S.wantVig) + "</div>" +
+        (S.goals.includes("glu") && S.days === 3 ? '<p class="note">혈당 관리는 이틀 넘게 쉬지 않는 것이 좋아 주 4일 이상을 권장합니다.</p>' : "") },
+    { id: "fit", fig: "bike", title: "측정한 체력 값이 있나요?", lead: "추정 VO₂max가 있으면 기구 설정값까지 계산합니다.", valid: () => S.vo2 === "" || (+S.vo2 >= 10 && +S.vo2 <= 80), why: "VO₂max는 10~80 사이로 입력하세요", skip: true,
+      html: () => '<div class="fields">' + numField("vo2", "추정 VO₂max", "mL/kg/min", true) + "</div>" +
+        '<p class="note">YMCA 자전거검사 같은 최대하검사 결과를 넣으면 됩니다. 처방 단계는 운동 경험으로 자동 설정되며, 결과의 처방 탭에서 바꿀 수 있습니다.</p>' },
+  ];
+  const TOTAL = Q.length;
+
+  function optGrid(key, items, cols = 2) {
+    return '<div class="opts g' + cols + '">' + items.map(([v, icn, label]) =>
+      '<button type="button" class="opt" data-multi="' + key + '" data-v="' + v + '" aria-pressed="' + S[key].includes(v) + '"><span class="mk">' + ic(icn) + "</span><b>" + esc(label) + '</b><span class="chk">' + CHK + "</span></button>").join("") + "</div>";
+  }
+  function optList(key, items) {
+    return '<div class="opts">' + items.map(([v, icn, label, sub]) =>
+      '<button type="button" class="opt" data-single="' + key + '" data-v="' + v + '" aria-pressed="' + (S[key] === v) + '"><span class="mk">' + ic(icn) + "</span><span><b>" + esc(label) + "</b><small>" + esc(sub) + '</small></span><span class="chk">' + CHK + "</span></button>").join("") + "</div>";
+  }
+  function seg(key, items) {
+    return '<div class="seg" role="group">' + items.map(([v, l]) => '<button type="button" data-seg="' + key + '" data-v="' + v + '" aria-pressed="' + (String(S[key]) === String(v)) + '">' + esc(l) + "</button>").join("") + "</div>";
+  }
+  function chip(key, label, on) { return '<button type="button" data-chip="' + key + '" aria-pressed="' + on + '">' + esc(label) + "</button>"; }
+  function numField(key, label, unit, full) {
+    return '<div class="field' + (full ? " full" : "") + '"><label for="i_' + key + '">' + esc(label) + '</label><div class="unit"><input id="i_' + key + '" data-num="' + key + '" type="number" inputmode="decimal" value="' + esc(S[key]) + '"><span>' + esc(unit) + "</span></div></div>";
+  }
+  function bmiLive() {
+    const h = +S.ht, w = +S.wt;
+    if (!(h >= 120 && w >= 30)) return '<span class="n">—</span><span class="t">키와 체중을 넣으면 BMI를 바로 계산합니다.</span>';
+    const b = w / Math.pow(h / 100, 2);
+    return '<span class="n">' + r1(b) + '</span><span class="t"><b>' + bmiClass(b) + "</b> · 대한비만학회 기준" + (S.waist && +S.waist >= (S.sex === "M" ? 90 : 85) ? " · 복부비만" : "") + "</span>";
+  }
+  function weekPrev() {
+    const PAT = { 3: [0, 2, 4], 4: [0, 1, 3, 4], 5: [0, 1, 2, 3, 4], 6: [0, 1, 2, 3, 4, 5], 7: [0, 1, 2, 3, 4, 5, 6] };
+    return ["월", "화", "수", "목", "금", "토", "일"].map((n, i) => '<div class="' + (PAT[S.days].includes(i) ? "on" : "") + '">' + n + "</div>").join("");
+  }
+  function volPrev() {
+    const tot = S.days * S.mins, pct = Math.min(100, tot / 300 * 100);
+    return '<div class="row"><span>주간 운동 시간 <b>' + tot + "분</b></span><span>권장 150분" + (tot >= 150 ? " 충족" : "까지 " + (150 - tot) + "분") + '</span></div><div class="trk"><i style="width:' + pct + '%"></i><b style="left:50%"></b></div>';
+  }
+  function bodyMap() {
+    const on = (z) => S.pain.includes(z) ? " on" : "";
+    const zones = [["shoulder", "어깨"], ["back", "허리"], ["knee", "무릎"]];
+    return '<div class="bodymap"><svg viewBox="0 0 100 150" role="group" aria-label="몸 뒷모습">' +
+      '<circle class="bm-body" cx="50" cy="15" r="10"/><path class="bm-body" d="M30 30h40l6 46H24z"/><path class="bm-body" d="M30 31l-12 38 6 2 12-30zM70 31l12 38-6 2-12-30z"/>' +
+      '<path class="bm-body" d="M26 76h22l-2 66h-12zM52 76h22l-8 66h-12z"/>' +
+      '<g data-zone="shoulder" role="button" tabindex="0" aria-label="어깨" aria-pressed="' + S.pain.includes("shoulder") + '"><circle class="bm-zone' + on("shoulder") + '" cx="31" cy="34" r="7.5"/><circle class="bm-zone' + on("shoulder") + '" cx="69" cy="34" r="7.5"/></g>' +
+      '<g data-zone="back" role="button" tabindex="0" aria-label="허리" aria-pressed="' + S.pain.includes("back") + '"><ellipse class="bm-zone' + on("back") + '" cx="50" cy="66" rx="13" ry="7.5"/></g>' +
+      '<g data-zone="knee" role="button" tabindex="0" aria-label="무릎" aria-pressed="' + S.pain.includes("knee") + '"><circle class="bm-zone' + on("knee") + '" cx="38" cy="110" r="7"/><circle class="bm-zone' + on("knee") + '" cx="62" cy="110" r="7"/></g>' +
+      '</svg><div class="bm-list"><p class="note">그림의 점선 부위를 누르거나 아래에서 고르세요.</p><div class="chips">' +
+      zones.map(([z, l]) => '<button type="button" data-zone="' + z + '" aria-pressed="' + S.pain.includes(z) + '">' + l + "</button>").join("") +
+      '<button type="button" data-zone="none" aria-pressed="' + (S.pain.length === 0 && !!S._painNone) + '">없음</button></div></div></div>';
+  }
+
+  // ---------- render shell ----------
+  function progBar() { return '<div class="prog" role="progressbar" aria-label="진행률" aria-valuemin="1" aria-valuemax="' + TOTAL + '" aria-valuenow="' + idx + '">' + Q.map((_, i) => "<i" + (i < idx ? ' class="on"' : "") + "></i>").join("") + "</div>"; }
+  function qScreen(q, anim) {
+    return '<div class="scr ' + anim + '"><div class="qhead"><div><div class="step">' + String(idx).padStart(2, "0") + " / " + TOTAL + "</div><h2>" + esc(q.title) + "</h2></div>" +
+      (q.fig ? FIG.svg(q.fig) : "") + '</div><p class="lead">' + esc(q.lead) + "</p>" + q.html() + "</div>";
+  }
+  function render() {
+    const body = $("body"), foot = $("foot"), mid = $("barMid");
+    $("back").hidden = idx === 0;
+    $("skip").hidden = true;
+    const anim = dir === "l" ? "in-l" : "in-r";
+    if (idx === 0) {
+      mid.innerHTML = '<div class="apptitle">FITT-VP <span>처방</span></div>';
+      body.innerHTML = '<div class="scr hero rise ' + anim + '"><div class="stage"><div class="chk"></div><span class="badge">ACSM · FITT-VP</span><span class="hrb">' + ic("heart") + '<span id="heroHr">118</span></span>' + FIG.svg("walkT") + "</div>" +
+        "<h1>내 몸에 맞는<br><span>운동 처방</span> 만들기</h1>" +
+        "<p>10가지 질문에 답하면 목표 강도, FITT-VP, 일주일 계획, 운동 동작, 유의사항을 만들어 드립니다. ACSM 운동검사·운동처방 지침 기반의 모의 처방입니다.</p>" +
+        '<div class="flow"><div>' + ic("goal") + "목표</div><div>" + ic("body") + "몸 상태</div><div>" + ic("place") + "환경</div><div>" + ic("rx") + "처방</div></div>" +
+        '<p class="sub">예시로 바로 체험하기</p><div class="opts">' + Object.entries(PRESETS).map(([k, p], i) =>
+          '<button type="button" class="opt preset" data-preset="' + k + '">' + FIG.svg(p.fig, "", i * 0.17) + "<span><b>" + esc(p.label) + "</b><small>" + esc(p.sub) + '</small></span><span class="go">' + ic("arrow") + "</span></button>").join("") + "</div></div>";
+      foot.innerHTML = '<button class="primary" id="go">직접 입력해서 시작하기 ' + ic("arrow") + "</button>";
+      $("go").onclick = () => { if (!S.goals.length) S = JSON.parse(JSON.stringify(BLANK)); dir = "r"; idx = 1; render(); };
+      heroHr();
+      return;
+    }
+    if (idx <= TOTAL) {
+      const q = Q[idx - 1];
+      mid.innerHTML = progBar();
+      $("skip").hidden = !q.skip;
+      body.innerHTML = qScreen(q, anim);
+      foot.innerHTML = '<p class="why" id="why"' + (q.valid() || !q.why ? " hidden" : "") + ">" + esc(q.why || "") + '</p><button class="primary" id="next"' + (q.valid() ? "" : " disabled") + ">" +
+        (editing ? "결과에 반영하기" : idx === TOTAL ? "처방 만들기" : "다음") + " " + ic("arrow") + "</button>";
+      $("next").onclick = next;
+      body.scrollTop = 0;
+      const h = body.querySelector("h2"); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
+      return;
+    }
+    if (idx === TOTAL + 1) {
+      mid.innerHTML = '<div class="apptitle">처방 <span>계산 중</span></div>';
+      body.innerHTML = '<div class="scr loading fade">' + FIG.svg("walkT") + '<h2>처방을 만드는 중</h2><div class="checks">' +
+        ["위험요인·대사증후군 확인", "목표 심박수·강도 계산", "FITT-VP 구성", "일주일 계획·동작 배치"].map((x) => "<div><span>" + CHK + "</span>" + x + "</div>").join("") + "</div></div>";
+      foot.innerHTML = "";
+      setTimeout(() => { if (idx === TOTAL + 1) { idx = TOTAL + 2; tab = "sum"; dayPick = null; fittPick = 0; dir = "r"; render(); } }, 2200);
+      return;
+    }
+    mid.innerHTML = '<div class="apptitle">나의 <span>운동 처방</span></div>';
+    $("back").hidden = false;
+    $("skip").hidden = false; $("skip").textContent = "답변 수정";
+    body.innerHTML = resultHTML();
+    body.scrollTop = 0;
+    const T = [["sum", "요약"], ["int", "강도"], ["fitt", "처방"], ["plan", "계획"], ["care", "주의"]];
+    const ti = T.findIndex((x) => x[0] === tab);
+    if (!foot.classList.contains("tabs")) {
+      foot.className = "foot tabs"; foot.style.padding = ""; foot.setAttribute("role", "tablist");
+      foot.innerHTML = '<span class="ind"></span>' + T.map(([k, l]) => '<button class="tab" role="tab" data-tab="' + k + '" aria-selected="false">' + ic(k) + l + "</button>").join("");
+    }
+    foot.querySelectorAll(".tab").forEach((b, i) => b.setAttribute("aria-selected", String(i === ti)));
+    foot.querySelector(".ind").style.left = ti * 20 + "%";
+    afterResult();
+  }
+  function resetFoot() { const f = $("foot"); f.className = "foot"; f.style.padding = ""; f.removeAttribute("role"); $("skip").textContent = "건너뛰기"; }
+  function heroHr() {
+    let v = 116;
+    const tick = () => { const el = $("heroHr"); if (!el) return; v = 116 + Math.round(Math.sin(Date.now() / 900) * 4 + Math.random() * 2); el.textContent = v; setTimeout(tick, 900); };
+    setTimeout(tick, 900);
+  }
+  function afterResult() {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      document.querySelectorAll("[data-w]").forEach((el) => (el.style.width = el.dataset.w + "%"));
+      document.querySelectorAll("[data-left]").forEach((el) => (el.style.left = el.dataset.left + "%"));
+    }));
+    document.querySelectorAll("[data-count]").forEach((el) => {
+      const to = parseFloat(el.dataset.count), dec = +(el.dataset.dec || 0), t0 = performance.now(), dur = 800;
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) { el.textContent = to.toFixed(dec); return; }
+      const step = (now) => { const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3); el.textContent = (to * e).toFixed(dec); if (p < 1) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
+    });
+  }
+
+  const shown = (i) => i < 1 || i > TOTAL || !Q[i - 1].when || Q[i - 1].when();
+  function step(d) { do { idx += d; } while (!shown(idx)); }
+  function toResult() { editing = false; idx = TOTAL + 1; resetFoot(); render(); }
+  function next() {
+    if (!Q[idx - 1].valid()) return;
+    if (Q[idx - 1].id === "exp") S.phase = S.exp === "reg" ? "imp" : "init";
+    dir = "r";
+    if (editing) return toResult();
+    step(1); resetFoot(); render();
+  }
+  $("back").onclick = () => {
+    dir = "l";
+    if (idx > TOTAL + 1) idx = TOTAL;
+    else if (editing) { dir = "r"; return toResult(); }
+    else { idx = Math.max(0, idx - 1); while (!shown(idx)) idx--; }
+    resetFoot(); render();
+  };
+  $("skip").onclick = () => {
+    if (idx > TOTAL + 1) { tab = "sum"; render(); const a = $("answers"); if (a) a.scrollIntoView({ behavior: "smooth" }); return; }
+    dir = "r"; if (editing) return toResult(); step(1); resetFoot(); render();
+  };
+
+  // ---------- events ----------
+  function togglePain(z) {
+    if (z === "none") { S.pain = []; S._painNone = true; }
+    else { S._painNone = false; S.pain = S.pain.includes(z) ? S.pain.filter((x) => x !== z) : [...S.pain, z]; }
+    refreshQ();
+  }
+  $("app").addEventListener("click", (e) => {
+    const z = e.target.closest("[data-zone]");
+    if (z) { togglePain(z.dataset.zone); return; }
+    const t = e.target.closest("button");
+    if (!t) return;
+    if (t.dataset.preset) { S = JSON.parse(JSON.stringify(PRESETS[t.dataset.preset].d)); toResult(); return; }
+    if (t.dataset.goto) { editing = true; dir = "r"; idx = +t.dataset.goto; resetFoot(); render(); return; }
+    if (t.dataset.phase) { S.phase = t.dataset.phase; render(); return; }
+    if (t.dataset.multi) { const k = t.dataset.multi, v = t.dataset.v; S[k] = S[k].includes(v) ? S[k].filter((x) => x !== v) : [...S[k], v]; refreshQ(); return; }
+    if (t.dataset.single) { S[t.dataset.single] = t.dataset.v; refreshQ(); const q = Q[idx - 1]; if (q && q.auto && !editing) setTimeout(() => { if (Q[idx - 1] === q) next(); }, 320); return; }
+    if (t.dataset.seg) { const k = t.dataset.seg; S[k] = ["days", "mins"].includes(k) ? +t.dataset.v : t.dataset.v; refreshQ(); return; }
+    if (t.dataset.chip) {
+      const k = t.dataset.chip;
+      if (k === "vig") S.wantVig = !S.wantVig;
+      else { const v = k.split(":")[1]; S.cond = S.cond.includes(v) ? S.cond.filter((x) => x !== v) : [...S.cond, v]; }
+      refreshQ(); return;
+    }
+    if (t.dataset.tab) { if (t.dataset.tab !== tab) { tab = t.dataset.tab; render(); } return; }
+    if (t.dataset.day !== undefined) { dayPick = +t.dataset.day; render(); return; }
+    if (t.dataset.fitt !== undefined) { fittPick = +t.dataset.fitt; render(); return; }
+    if (t.id === "restart") { dir = "l"; idx = 0; resetFoot(); render(); return; }
+  });
+  $("app").addEventListener("keydown", (e) => {
+    const z = e.target.closest && e.target.closest("g[data-zone]");
+    if (z && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); togglePain(z.dataset.zone); return; }
+    if (e.key === "Enter" && e.target.dataset && e.target.dataset.num) { e.preventDefault(); const b = $("next"); if (b && !b.disabled) next(); }
+  });
+  $("app").addEventListener("input", (e) => {
+    const k = e.target.dataset.num; if (!k) return;
+    S[k] = e.target.value;
+    const lb = $("liveBmi"); if (lb) lb.innerHTML = bmiLive();
+    const q = Q[idx - 1]; if (q) { $("next").disabled = !q.valid(); const w = $("why"); if (w) w.hidden = q.valid() || !q.why; }
+  });
+  function refreshQ() {
+    const body = $("body"), y = body.scrollTop, q = Q[idx - 1]; if (!q) return;
+    const open = body.querySelector("details.blood")?.open;
+    const focusKey = document.activeElement && (document.activeElement.dataset.v || document.activeElement.dataset.zone);
+    body.innerHTML = qScreen(q, "");
+    if (open !== undefined) { const d = body.querySelector("details.blood"); if (d) d.open = open; }
+    body.scrollTop = y;
+    if (focusKey) { const el = body.querySelector('[data-v="' + focusKey + '"],button[data-zone="' + focusKey + '"]'); if (el) el.focus({ preventScroll: true }); }
+    $("next").disabled = !q.valid();
+    const w = $("why"); if (w) w.hidden = q.valid() || !q.why;
+  }
+
+  // ---------- engine ----------
+  function D() {
+    const n = (k) => { const v = parseFloat(S[k]); return Number.isFinite(v) ? v : null; };
+    const d = {};
+    ["age", "ht", "wt", "waist", "rhr", "sbp", "dbp", "fpg", "a1c", "hdl", "ldl", "tg", "vo2"].forEach((k) => (d[k] = n(k)));
+    Object.assign(d, { sex: S.sex, smoke: S.smoke, days: +S.days, mins: +S.mins, tod: S.tod, season: S.season, phase: S.phase, place: S.place || "home", eq: S.place === "pool" ? [] : S.eq, pain: S.pain, goals: S.goals, wantVig: S.wantVig });
+    const c = new Set(S.cond);
+    d.htnDx = c.has("htn"); d.dm = c.has("dm"); d.lipidMed = c.has("lipid"); d.bb = c.has("bb"); d.hypo = c.has("hypo"); d.famhx = c.has("fam");
+    d.regular = S.exp === "reg";
+    d.bmi = d.ht && d.wt ? d.wt / Math.pow(d.ht / 100, 2) : null;
+    d.htn = d.htnDx || (d.sbp !== null && d.sbp >= 130) || (d.dbp !== null && d.dbp >= 80);
+    d.prediab = !d.dm && ((d.fpg !== null && d.fpg >= 100) || (d.a1c !== null && d.a1c >= 5.7));
+    d.obeseUS = (d.bmi !== null && d.bmi >= 30) || (d.waist !== null && (d.sex === "M" ? d.waist > 102 : d.waist > 88));
+    d.older = d.age !== null && d.age >= 65;
+    const g = new Set(d.goals);
+    d.fBP = d.htn || g.has("bp"); d.fWT = g.has("wt") || (d.bmi !== null && d.bmi >= 25); d.fGLU = d.dm || d.prediab || g.has("glu"); d.fSTR = g.has("str"); d.fFIT = g.has("fit");
+    return d;
+  }
+  function riskFactors(d) {
+    const L = [], add = (name, y, why) => L.push({ name, state: y ? "y" : "n", why });
+    add("나이", d.age !== null && (d.sex === "M" ? d.age >= 45 : d.age >= 55), d.sex === "M" ? "남 45세 이상" : "여 55세 이상");
+    add("가족력", d.famhx, "조기 심혈관질환");
+    add("흡연", ["current", "quitRecent"].includes(d.smoke), "현재·6개월 내 금연");
+    add("좌식생활", !d.regular, "주 3일·30분 미충족");
+    add("비만", d.obeseUS, "BMI 30↑·허리 " + (d.sex === "M" ? "102" : "88") + "cm 초과");
+    add("혈압", d.htn, "130/80↑ 또는 약물");
+    const lipKnown = d.ldl !== null || d.hdl !== null || d.lipidMed;
+    L.push({ name: "지질", state: !lipKnown ? "u" : ((d.ldl !== null && d.ldl >= 130) || (d.hdl !== null && d.hdl < 40) || d.lipidMed) ? "y" : "n", why: "LDL 130↑·HDL 40↓·약물" });
+    if (d.dm) L.push({ name: "당뇨병", state: "p2", why: "위험요인이 아닌 대사질환으로 따로 고려" });
+    else L.push({ name: "당뇨 전단계", state: d.fpg === null && d.a1c === null ? "u" : d.prediab ? "y" : "n", why: "공복 100~125·HbA1c 5.7~6.4%" });
+    let n = L.filter((x) => x.state === "y").length;
+    if (d.hdl !== null && d.hdl >= 60) { L.push({ name: "HDL 60↑", state: "p", why: "음성 위험요인 −1" }); n -= 1; }
+    return { L, n: Math.max(0, n) };
+  }
+  function korea(d) {
+    const L = [], add = (name, y, why, known) => L.push({ name, state: y ? "y" : known ? "n" : "u", why });
+    add("허리", d.waist !== null && d.waist >= (d.sex === "M" ? 90 : 85), (d.sex === "M" ? "남 90" : "여 85") + "cm↑", d.waist !== null);
+    add("중성지방", (d.tg !== null && d.tg >= 150) || d.lipidMed, "150↑·약물", d.tg !== null);
+    add("HDL", (d.hdl !== null && d.hdl < (d.sex === "M" ? 40 : 50)) || d.lipidMed, (d.sex === "M" ? "남 40" : "여 50") + "↓·약물", d.hdl !== null);
+    add("혈압", d.htnDx || (d.sbp !== null && d.sbp >= 130) || (d.dbp !== null && d.dbp >= 85), "130/85↑·약물", d.sbp !== null);
+    add("혈당", d.dm || (d.fpg !== null && d.fpg >= 100), "공복 100↑·약물", d.fpg !== null);
+    const n = L.filter((x) => x.state === "y").length, u = L.filter((x) => x.state === "u").length;
+    return { L, n, u, label: n >= 3 ? "해당" : n + u >= 3 ? "판정 불가" : "아님" };
+  }
+  const bmiClass = (b) => b < 18.5 ? "저체중" : b < 23 ? "정상" : b < 25 ? "비만 전단계" : b < 30 ? "비만 1단계" : b < 35 ? "비만 2단계" : "비만 3단계";
+  function band(d) {
+    const cons = !d.regular || d.fBP || d.dm || d.older;
+    if (d.wantVig && !cons) return { lo: 0.6, hi: 0.8, name: "중~고강도", pct: "60~80%", rpe: [14, 16], label: "다소 힘들다~힘들다" };
+    if (d.phase === "init" && !d.regular) return { lo: 0.4, hi: 0.49, name: "중강도 하단", pct: "40~49%", rpe: [11, 12], label: "가볍다~약간 힘들다" };
+    if (d.phase === "init") return { lo: 0.4, hi: 0.59, name: "중강도", pct: "40~59%", rpe: [12, 13], label: "약간 힘들다" };
+    if (d.phase === "imp" || cons) return { lo: 0.5, hi: 0.59, name: "중강도 상단", pct: "50~59%", rpe: [12, 13], label: "약간 힘들다" };
+    return { lo: 0.5, hi: 0.7, name: "중~고강도", pct: "50~70%", rpe: [13, 15], label: "약간 힘들다~힘들다" };
+  }
+  const rpeTxt = (b) => b.rpe[0] + "~" + b.rpe[1];
+  function walkSetting(vlo, vhi) {
+    let Sp, G1;
+    if (vlo <= 13.5) { Sp = Math.max(50, (vlo - 3.5) / 0.1); G1 = 0; } else { Sp = 100; G1 = (vlo - 13.5) / 180; }
+    const G2 = Math.max(G1, (vhi - 3.5 - 0.1 * Sp) / (1.8 * Sp));
+    if (G2 > 0.15) return "걷기 " + r1(Sp * 0.06) + "km/h → 달리기 " + r1(Math.max(134, (vhi - 3.5) / 0.2) * 0.06) + "km/h";
+    return r1(Sp * 0.06) + "km/h · 경사 " + r1(G1 * 100) + "→" + r1(G2 * 100) + "%";
+  }
+  const bikeW = (v, bw) => Math.max(0, ((v - 7) * bw / 1.8) / 6.12);
+  const MODE = { tread: "트레드밀 걷기", bike: "실내자전거", outdoor: "야외 빠르게 걷기", pool: "수중 걷기·수영", home: "제자리 걷기·계단" };
+  const MODEFIG = { tread: "walkT", bike: "bike", outdoor: "walkO", pool: "swim", home: "march" };
+  function modes(d) {
+    const m = [], has = (x) => d.eq.includes(x), knee = d.pain.includes("knee");
+    if (d.place === "pool") m.push("pool");
+    if (has("bike") && d.place !== "outdoor") m.push("bike");
+    if (has("tread") && !["outdoor", "pool"].includes(d.place)) m.push("tread");
+    if (d.place === "outdoor") m.push("outdoor");
+    if (!m.length) m.push(d.place === "home" ? "home" : "outdoor");
+    if (!knee && m[0] === "bike" && m.includes("tread")) { m.splice(m.indexOf("tread"), 1); m.unshift("tread"); }
+    return m;
+  }
+  function modeDetail(m, d, b, vlo, vhi) {
+    if (m === "tread") return vlo !== null ? walkSetting(vlo, vhi) : "RPE " + rpeTxt(b) + "로 속도·경사 조절";
+    if (m === "bike") return vlo !== null && d.wt ? r0(bikeW(vlo, d.wt)) + "~" + r0(bikeW(vhi, d.wt)) + "W · 분당 50~60회전" : "RPE " + rpeTxt(b) + " · 분당 50~60회전";
+    if (m === "outdoor") { if (vlo === null || vlo > 13.5) return "대화는 되고 노래는 어려운 속도"; const sp = Math.max(50, (vlo - 3.5) / 0.1); return "시속 " + r1(sp * 0.06) + "km · 1km 약 " + r0(1000 / sp) + "분"; }
+    if (m === "pool") return "물속에선 심박수가 낮게 나와 RPE " + rpeTxt(b) + " 기준";
+    return "무릎을 높이 들며 제자리 걷기·계단, RPE " + rpeTxt(b);
+  }
+  // [name, part, fig] · alt: [name, part, why, fig]
+  const EX = {
+    legPush: { machine: ["레그프레스", "하체", "legpress"], db: ["고블릿 스쿼트", "하체", "squatG"], band: ["밴드 스쿼트", "하체", "squatA"], body: ["의자 스쿼트", "하체", "squatC"],
+      alt: { machine: ["레그프레스 (얕은 범위)", "하체", "무릎 굽힘 범위 제한", "legpressS"], db: ["박스 스쿼트", "하체", "의자 높이까지만 앉기", "squatC"], band: ["밴드 박스 스쿼트", "하체", "의자 높이까지만 앉기", "squatC"], body: ["높은 의자 스쿼트", "하체", "무릎 굽힘 범위 제한", "squatC"] } },
+    hip: { machine: ["레그컬", "허벅지 뒤", "legcurl"], db: ["덤벨 루마니안 데드리프트", "엉덩이·허벅지 뒤", "hinge"], band: ["밴드 힙 브리지", "엉덩이", "bridge"], body: ["힙 브리지", "엉덩이", "bridge"],
+      alt: { machine: ["레그컬", "허벅지 뒤", "허리 부담 적음", "legcurl"], db: ["덤벨 힙 브리지", "엉덩이", "허리 굽힘 동작 대신", "bridge"], band: ["밴드 힙 브리지", "엉덩이", "허리 굽힘 동작 대신", "bridge"], body: ["힙 브리지", "엉덩이", "허리 굽힘 동작 대신", "bridge"] } },
+    push: { machine: ["체스트프레스", "가슴·팔", "seatpress"], db: ["덤벨 플로어 프레스", "가슴·팔", "floorpress"], band: ["밴드 체스트프레스", "가슴·팔", "seatpressB"], body: ["벽 푸시업", "가슴·팔", "wallpush"],
+      alt: { machine: ["체스트프레스 (좁은 범위)", "가슴·팔", "어깨 각도 제한", "seatpress"], db: ["덤벨 플로어 프레스", "가슴·팔", "바닥이 범위를 막아 어깨 부담 적음", "floorpress"], band: ["밴드 체스트프레스", "가슴·팔", "가슴 높이에서만", "seatpressB"], body: ["벽 푸시업", "가슴·팔", "가장 가벼운 밀기", "wallpush"] } },
+    pull: { machine: ["시티드 로우", "등", "row"], db: ["원암 덤벨 로우", "등", "dbrow"], band: ["밴드 시티드 로우", "등", "rowB"], body: ["수건 로우 (문 손잡이)", "등", "standpull"] },
+    vpull: { machine: ["랫풀다운", "등·팔", "pulldown"], db: ["덤벨 풀오버", "등", "pullover"], band: ["밴드 랫풀다운", "등·팔", "pulldown"], body: ["엎드려 Y-T 들기", "등 위쪽", "ytraise"],
+      alt: { machine: ["페이스풀 (가슴 높이)", "등 위쪽", "머리 위로 당기는 동작 대신", "standpull"], db: ["엎드려 덤벨 리어 레이즈", "등 위쪽", "팔은 어깨 높이 아래로", "ytraise"], band: ["밴드 풀어파트", "등 위쪽", "가슴 높이에서만", "standpullB"], body: ["엎드려 T 들기", "등 위쪽", "팔은 어깨 높이까지만", "ytraise"] } },
+    press: { machine: ["숄더프레스", "어깨", "shpress"], db: ["덤벨 숄더프레스", "어깨", "shpress"], band: ["밴드 숄더프레스", "어깨", "shpress"], body: ["벽 파이크 푸시업", "어깨", "wallpush"] },
+  };
+  function exList(d) {
+    const tool = d.eq.includes("machine") && ["gym", "apt"].includes(d.place) ? "machine" : d.eq.includes("db") ? "db" : d.eq.includes("band") ? "band" : "body";
+    const pk = (k, flag) => { const e = EX[k]; if (flag && e.alt) { const a = e.alt[tool]; return { name: a[0], part: a[1], why: a[2], fig: a[3] }; } const a = e[tool]; return { name: a[0], part: a[1], why: "", fig: a[2] }; };
+    const knee = d.pain.includes("knee"), back = d.pain.includes("back"), sh = d.pain.includes("shoulder");
+    const L = [pk("legPush", knee), pk("hip", back), pk("push", sh), pk("pull"), pk("vpull", sh)];
+    if (!sh) L.push(pk("press"));
+    L.push({ name: "버드독", part: "몸통", why: back ? "윗몸일으키기 대신 척추 중립 유지" : "", fig: "birddog", core: true });
+    if (d.older) L.push({ name: "까치발 들기", part: "종아리", why: "보행·균형 보조", fig: "calfraise" });
+    return { L, tool: { machine: "머신 위주", db: "덤벨 위주", band: "밴드 위주", body: "맨몸 위주" }[tool], skipped: sh ? "어깨 통증으로 머리 위로 올리는 동작은 뺐습니다." : "" };
+  }
+  function dose(d) {
+    if (d.phase === "init") return { sets: "1~2세트", reps: "12~15회", load: "1RM 40~50% · 3~4회 여유 있는 무게" };
+    if (d.fSTR && !d.fBP && !d.older) return { sets: "2~4세트", reps: "6~10회", load: "1RM 70~80% · 1~3회 여유" };
+    return { sets: "2~3세트", reps: "8~12회", load: "1RM 60~70% · 2~3회 여유" };
+  }
+  function build() {
+    const d = D(), b = band(d), kr = korea(d), rf = riskFactors(d), md = modes(d), ds = dose(d), ex = exList(d);
+    let vlo = null, vhi = null;
+    if (d.vo2 !== null) { vlo = (d.vo2 - 3.5) * b.lo + 3.5; vhi = (d.vo2 - 3.5) * b.hi + 3.5; }
+    let hr = null;
+    if (d.age !== null && d.rhr !== null) { const hm = r0(208 - 0.7 * d.age), hrr = hm - d.rhr; hr = { hm, hrr, lo: hrr * b.lo + d.rhr, hi: hrr * b.hi + d.rhr }; }
+    const aeroTarget = d.phase === "init" && !d.regular ? 120 : d.fWT ? (d.phase === "init" ? 150 : d.phase === "imp" ? 200 : 250) : 150;
+    const PAT = { 3: [0, 2, 4], 4: [0, 1, 3, 4], 5: [0, 1, 2, 3, 4], 6: [0, 1, 2, 3, 4, 5], 7: [0, 1, 2, 3, 4, 5, 6] };
+    const active = PAT[d.days] || PAT[3];
+    const resCount = d.days >= 6 && d.fSTR ? 3 : 2;
+    const resDays = []; active.forEach((x) => { if (resDays.length < resCount && !resDays.some((y) => Math.abs(y - x) <= 1)) resDays.push(x); });
+    active.forEach((x) => { if (resDays.length < resCount && !resDays.includes(x)) resDays.push(x); });
+    const isoDays = d.fBP && d.phase !== "init" ? active.filter((x) => !resDays.includes(x)).slice(0, 3) : [];
+    const balDays = d.older ? active.filter((_, i) => i % 2 === 0).slice(0, 3) : [];
+    const cool = d.fBP ? 10 : 5, warm = 5, cap = d.phase === "init" && !d.regular ? 30 : 60;
+    const grip = d.eq.includes("grip");
+    let total = 0, mi = 0;
+    const week = [0, 1, 2, 3, 4, 5, 6].map((i) => {
+      if (!active.includes(i)) return { rest: true };
+      const isRes = resDays.includes(i), iso = isoDays.includes(i), bal = balDays.includes(i);
+      const resMin = d.mins < 40 ? 15 : 20;
+      const aMin = Math.max(10, Math.min(cap, d.mins - warm - cool - (isRes ? resMin : 0) - (iso ? 10 : 0) - (bal ? 10 : 0)));
+      total += aMin;
+      const m = md[mi++ % md.length];
+      const items = [{ k: "warm", min: warm, name: "준비운동", sub: "가볍게 걷기·관절 돌리기" }, { k: "aero", min: aMin, name: MODE[m], sub: modeDetail(m, d, b, vlo, vhi), fig: MODEFIG[m] }];
+      if (isRes) items.push({ k: "res", min: resMin, name: "저항운동", sub: ex.L.length + "종목 · " + ds.reps + " × " + ds.sets });
+      if (iso) items.push({ k: "iso", min: 10, name: grip ? "핸드그립" : "벽 스쿼트", sub: grip ? "2분 × 4세트 · 세트 간 1분" : d.pain.includes("knee") ? "얕은 각도, 통증 없는 범위 · 2분 × 4세트" : "2분 × 4세트 · 세트 간 1분", fig: grip ? "handgrip" : "wallsit" });
+      if (bal) items.push({ k: "bal", min: 10, name: "균형운동", sub: "한 발 서기·일자 걷기", fig: "balance" });
+      items.push({ k: "cool", min: cool, name: "정리운동·스트레칭", sub: d.fBP ? "천천히 걷기로 심박수 낮추기" : "주요 근육 10~30초씩", fig: "stretch" });
+      return { rest: false, isRes, aMin, items, mode: m };
+    });
+    return { d, b, kr, rf, md, ds, ex, vlo, vhi, hr, aeroTarget, week, total };
+  }
+
+  // ---------- result screens ----------
+  const NAMES = ["월", "화", "수", "목", "금", "토", "일"];
+  function stackBar(items) {
+    const tot = items.reduce((a, x) => a + x.min, 0);
+    return '<div class="stack" aria-hidden="true">' + items.map((x) => '<i class="s-' + x.k + '" data-w="' + (x.min / tot * 100).toFixed(2) + '">' + (x.min / tot > 0.14 ? x.min + "′" : "") + "</i>").join("") + "</div>";
+  }
+  const LEG = { warm: ["준비", "var(--fig-far)"], aero: ["유산소", "var(--red)"], res: ["저항", "var(--ink)"], iso: ["등척성", "var(--warn)"], bal: ["균형", "var(--good)"], cool: ["정리", "var(--fig-far)"] };
+  function legend(items) { const seen = new Set(); return '<div class="legend">' + items.filter((x) => !seen.has(x.k) && seen.add(x.k)).map((x) => '<span style="--c:' + LEG[x.k][1] + '">' + LEG[x.k][0] + " " + x.min + "분</span>").join("") + "</div>"; }
+  function answersCard() {
+    const G = { bp: "혈압", wt: "체중", glu: "혈당", fit: "체력", str: "근력" }, EXP = { none: "거의 안 함", some: "가끔", reg: "꾸준히" };
+    const P = { gym: "헬스장", apt: "아파트 헬스장", home: "집", outdoor: "야외", pool: "수영장" }, EQ = { tread: "트레드밀", bike: "자전거", machine: "머신", db: "덤벨", band: "밴드", grip: "핸드그립" };
+    const PN = { knee: "무릎", back: "허리", shoulder: "어깨" };
+    const rows = [
+      [1, "목표", S.goals.map((g) => G[g]).join(", ")], [2, "운동 경험", EXP[S.exp] || "—"],
+      [3, "신체", (S.sex === "M" ? "남" : "여") + " · " + S.age + "세 · " + S.ht + "cm · " + S.wt + "kg"],
+      [4, "혈압·심박", S.sbp ? S.sbp + "/" + S.dbp + (S.rhr ? " · " + S.rhr + "bpm" : "") : "미입력"],
+      [5, "건강 상태", S.cond.length ? S.cond.length + "개 선택" : "없음"], [6, "불편한 부위", S.pain.map((x) => PN[x]).join(", ") || "없음"],
+      [7, "장소", P[S.place] || "—"], [8, "장비", S.place === "pool" ? "—" : S.eq.map((x) => EQ[x]).join(", ") || "없음"],
+      [9, "일정", "주 " + S.days + "일 · " + S.mins + "분"], [10, "VO₂max", S.vo2 || "미입력"],
+    ];
+    return '<details class="card" id="answers"><summary>내 답변 보기·수정</summary><div class="answers">' + rows.map((r) =>
+      '<button type="button" class="ans" data-goto="' + r[0] + '"><span>' + esc(r[1]) + "</span><span>" + esc(r[2]) + '</span><span class="go">' + ic("edit") + "</span></button>").join("") + "</div></details>";
+  }
+  const li = (x) => '<li><span class="tag ' + (x.state === "p2" ? "n" : x.state) + '">' + ({ y: "해당", p: "−1", u: "미입력", p2: "별도", n: "—" }[x.state]) + "</span><span><b>" + esc(x.name) + "</b> · " + esc(x.why) + "</span></li>";
+
+  function resultHTML() {
+    const R = build(), { d, b } = R;
+    if (dayPick === null || !R.week[dayPick] || R.week[dayPick].rest) dayPick = R.week.findIndex((w) => !w.rest);
+    const first = R.week[R.week.findIndex((w) => !w.rest)];
+    const focus = [];
+    if (d.fBP) focus.push("혈압"); if (d.fWT) focus.push("체중·허리"); if (d.fGLU) focus.push("혈당"); if (d.fFIT || !focus.length) focus.push("심폐지구력"); if (d.fSTR) focus.push("근력"); if (d.older) focus.push("균형");
+    const placeName = { gym: "헬스장", apt: "아파트 헬스장", home: "집", outdoor: "야외", pool: "수영장" }[d.place];
+    const hrBig = R.hr && !d.bb ? '<span data-count="' + r0(R.hr.lo) + '">' + r0(R.hr.lo) + "</span>~" + '<span data-count="' + r0(R.hr.hi) + '">' + r0(R.hr.hi) + "</span><small> bpm</small>" : "RPE " + rpeTxt(b);
+
+    if (tab === "sum") {
+      const E = [];
+      if (d.fBP && d.sbp !== null && d.dbp !== null) E.push(["수축기 혈압", d.sbp + " → " + r0(d.sbp - 6), 6 / d.sbp * 100 * 8]);
+      if (d.waist !== null && d.fWT) E.push(["허리둘레", d.waist + " → " + r1(d.waist - 2.75) + "cm", 2.75 / d.waist * 100 * 15]);
+      if (d.vo2 !== null) { const g = d.regular ? 1.055 : 1.115; E.push(["VO₂max", d.vo2 + " → " + r1(d.vo2 * g), (g - 1) * 100 * 4]); }
+      if (d.hdl !== null && d.hdl < 60) E.push(["HDL", d.hdl + " → " + r1(d.hdl + 2.5), 2.5 / d.hdl * 100 * 8]);
+      E.push(["근력", d.regular ? "+5~15%" : "+20~40%", d.regular ? 30 : 75]);
+      if (d.fWT && d.wt !== null) E.push(["체중", d.wt + " → " + r1(d.wt - 2) + "kg", 2 / d.wt * 100 * 15]);
+      const meter = (L) => '<div class="meter5">' + L.map((x) => '<i class="' + (x.state === "y" ? "on" : x.state === "u" ? "u" : "") + '"></i>').join("") + "</div>";
+      return '<div class="scr fade rise">' +
+        '<div class="card ink"><div class="focus">' + focus.map((f) => "<span>" + esc(f) + "</span>").join("") + '<span class="env">' + esc(placeName) + " · 주 " + d.days + "일 · " + d.mins + "분</span></div>" +
+        '<div class="today">' + FIG.svg(MODEFIG[first.mode]) + '<div><div class="kicker">' + NAMES[R.week.indexOf(first)] + "요일 첫 운동 · " + esc(b.name) + '</div><div class="ttl">' + esc(MODE[first.mode]) + " " + first.aMin + '분</div><div class="big">' + hrBig + '</div><div class="kicker">' + (R.hr && !d.bb ? "목표 심박수 · RPE " + rpeTxt(b) : esc(b.label)) + "</div></div></div>" +
+        stackBar(first.items) + legend(first.items) + "</div>" +
+        '<div class="stats"><div class="stat"><div class="k">BMI</div><div class="n" data-count="' + (d.bmi ? r1(d.bmi) : 0) + '" data-dec="1">' + (d.bmi ? r1(d.bmi) : "—") + '</div><div class="t">' + (d.bmi ? bmiClass(d.bmi) : "") + "</div></div>" +
+        '<div class="stat"><div class="k">대사증후군</div><div class="n"><span data-count="' + R.kr.n + '">' + R.kr.n + "</span><small>/5</small></div>" + meter(R.kr.L) + '<div class="t">' + R.kr.label + "</div></div>" +
+        '<div class="stat"><div class="k">ACSM 위험요인</div><div class="n"><span data-count="' + R.rf.n + '">' + R.rf.n + '</span><small>개</small></div><div class="t">우선순위 판단용</div></div></div>' +
+        '<details class="card"><summary>판정 근거 보기</summary><h3>국내 대사증후군 기준</h3><ul class="rf">' + R.kr.L.map(li).join("") + '</ul><h3>ACSM 심혈관 위험요인</h3><ul class="rf">' + R.rf.L.map(li).join("") + "</ul></details>" +
+        '<div class="card"><h3>' + ic("int") + '12주 뒤 기대 변화</h3><div class="chg">' + E.map((e) => '<div class="r"><b>' + esc(e[0]) + '</b><div class="trk"><i data-w="' + Math.min(100, e[2]).toFixed(1) + '"></i></div><span class="v">' + esc(e[1]) + "</span></div>").join("") +
+        '</div><p class="disc">문헌 평균(Edwards 2023, Armstrong 2022, Kodama 2007 등) 기준 기대치이며 개인차가 큽니다. 8·12주에 다시 측정해 조정합니다.</p></div>' +
+        answersCard() + '<button class="secondary" id="restart">처음 화면으로</button>' +
+        '<p class="disc">수업 발표용 모의 처방입니다. 근거: ACSM 운동검사·운동처방 지침 11·12판, Donnelly(2009), ACSM 저항운동 입장문(2026), Edwards(2023), 대한비만학회(2022).</p></div>';
+    }
+    if (tab === "int") {
+      let hrCard;
+      if (R.hr) {
+        const zones = [[0, 30, "var(--zone1)"], [30, 40, "var(--zone2)"], [40, 60, "var(--zone3)"], [60, 90, "var(--zone4)"], [90, 100, "var(--red)"]];
+        const lo = b.lo * 100, hi = b.hi * 100;
+        hrCard = '<div class="card"><h3>' + ic("heart") + "심박수 목표 · HRR " + b.pct + "</h3>" +
+          (d.bb ? '<p class="note">베타차단제는 심박수를 낮추므로 아래 범위 대신 RPE를 기준으로 삼습니다.</p>' : '<div class="big"><span data-count="' + r0(R.hr.lo) + '">' + r0(R.hr.lo) + "</span>~<span data-count=\"" + r0(R.hr.hi) + '">' + r0(R.hr.hi) + "</span><small> bpm</small></div>") +
+          '<div class="zone"><div class="zbar">' + zones.map((z) => '<span style="width:' + (z[1] - z[0]) + "%;background:" + z[2] + '"></span>').join("") +
+          '<span class="tgt" style="left:0;width:0" data-left="' + lo + '" data-w="' + (hi - lo) + '"></span></div>' +
+          '<div class="zlbl"><span class="l0" style="left:0">안정 ' + d.rhr + '</span><span class="hot" style="left:' + (lo + hi) / 2 + '%">' + r0(R.hr.lo) + "~" + r0(R.hr.hi) + '</span><span class="l1" style="left:100%">최대 ' + R.hr.hm + "</span></div>" +
+          '<div class="legend"><span style="--c:var(--zone2)">가벼움 30~39%</span><span style="--c:var(--zone3)">중강도 40~59%</span><span style="--c:var(--zone4)">고강도 60~89%</span></div></div>' +
+          '<div class="formula">최대심박수 208 − 0.7 × ' + d.age + " = " + R.hr.hm + " · 예비량 " + R.hr.hm + " − " + d.rhr + " = " + R.hr.hrr + "<br>목표 = " + R.hr.hrr + " × " + b.lo.toFixed(2) + "~" + b.hi.toFixed(2) + " + " + d.rhr + "</div></div>";
+      } else hrCard = '<div class="card"><h3>' + ic("heart") + '심박수 목표</h3><p class="note">나이와 안정시 심박수를 입력하면 목표 심박수 구간을 그려 드립니다.</p></div>';
+      const words = { 6: "", 7: "극히 가볍다", 9: "매우 가볍다", 11: "가볍다", 13: "약간 힘들다", 15: "힘들다", 17: "매우 힘들다", 19: "극히 힘들다", 20: "" };
+      const rpe = '<div class="card"><h3>' + ic("int") + "느낌으로 보기 · RPE " + rpeTxt(b) + '</h3><div class="rpe">' +
+        Array.from({ length: 15 }, (_, i) => i + 6).map((v) => '<i class="' + (v >= b.rpe[0] && v <= b.rpe[1] ? "on" : "") + '" style="--h:' + ((v - 5) * 1.6) + 'px">' + v + "</i>").join("") +
+        '</div><div class="rpewords"><span>6 전혀 힘들지 않다</span><span>13 약간 힘들다</span><span>20 최대</span></div><p class="note"><b>' + esc(b.label) + "</b> · 말은 할 수 있지만 노래는 어려운 정도. 심박수와 어긋나면 RPE를 따릅니다.</p></div>";
+      const mach = '<div class="card"><h3>' + ic("tread") + "내 기구 설정값</h3>" + R.md.map((m, i) => '<div class="mrow">' + FIG.svg(MODEFIG[m], "", i * 0.3) + "<div><b>" + esc(MODE[m]) + "</b><span>" + esc(modeDetail(m, d, b, R.vlo, R.vhi)) + "</span></div></div>").join("") +
+        (R.vlo !== null ? '<div class="formula">목표 VO₂ = (' + d.vo2 + " − 3.5) × " + b.lo.toFixed(2) + "~" + b.hi.toFixed(2) + " + 3.5 = " + r1(R.vlo) + "~" + r1(R.vhi) + " mL/kg/min<br>ACSM 걷기·자전거 대사공식으로 역산</div>" : '<p class="note">추정 VO₂max를 입력하면 속도·경사·와트까지 계산합니다.</p>') + "</div>";
+      const kcal = R.vlo !== null && d.wt !== null ? (() => { const kc = (R.vlo / 3.5) * 3.5 * d.wt / 200; return '<div class="stats"><div class="stat"><div class="k">분당 소비</div><div class="n"><span data-count="' + r1(kc) + '" data-dec="1">' + r1(kc) + '</span><small>kcal</small></div></div><div class="stat"><div class="k">30분 운동</div><div class="n"><span data-count="' + r0(kc * 30) + '">' + r0(kc * 30) + '</span><small>kcal</small></div></div><div class="stat"><div class="k">강도</div><div class="n"><span data-count="' + r1(R.vlo / 3.5) + '" data-dec="1">' + r1(R.vlo / 3.5) + "</span><small>METs</small></div></div></div>"; })() : "";
+      return '<div class="scr fade rise"><h2>목표 강도 · ' + esc(b.name) + "</h2>" + hrCard + rpe + mach + kcal + "</div>";
+    }
+    if (tab === "fitt") {
+      const grip = d.eq.includes("grip");
+      const cols = [
+        ["유산소", MODEFIG[R.md[0]], { F: (d.fBP || d.fWT ? "주 5~7일" : d.fGLU ? "주 3~7일 (2일 연속 쉬지 않기)" : "주 3~5일") + ((d.fBP || d.fWT) && d.days < 5 ? " · 지금 주 " + d.days + "일 → 5일 이상 권장" : ""), I: b.name + " · HRR " + b.pct + " · RPE " + rpeTxt(b), T: d.phase === "init" && !d.regular ? "1회 20~30분 (나눠서 누적 가능)" : "1회 30~60분", Ty: R.md.map((m) => MODE[m]).join(", "), V: "주 " + R.aeroTarget + "분" + (d.fWT ? " → 최종 250~300분" : " 이상"), P: "시간 먼저, 그다음 강도 (4주 단위)" }],
+        ["저항", R.ex.L[0].fig, { F: d.fSTR ? "주 2~3일 (비연속)" : "주 2일 (비연속)", I: R.ds.load, T: R.ex.L.length + "종목 · " + R.ds.reps + " × " + R.ds.sets, Ty: R.ex.tool, V: "실패 지점까지 하지 않기" + (d.fBP ? " · 숨 참지 않기" : ""), P: "목표 반복 상한을 2회 연속 넘기면 2~10% 증량" }],
+      ];
+      if (d.fBP) cols.push(["등척성", grip ? "handgrip" : "wallsit", { F: "주 3일", I: grip ? "핸드그립 최대 힘의 30%" : "벽 스쿼트 · RPE 13~15", T: "2분 × 4세트 · 휴식 1~2분", Ty: grip ? "핸드그립" : "벽 스쿼트", V: "보조 운동", P: d.phase === "init" ? "5주차부터 시작" : "진행 중" }]);
+      cols.push(["유연성", "stretch", { F: "주 2~3일 이상", I: "당김이 느껴지는 지점", T: "동작당 10~30초 · 2~4회", Ty: "정적 스트레칭", V: "주요 근육군 모두", P: "—" }]);
+      if (d.older) cols.push(["균형", "balance", { F: "주 2~3일", I: "흔들리지 않는 범위", T: "10~20분", Ty: "한 발 서기·일자 걷기·태극권", V: "주 60분 이상", P: "지지면을 줄여 난이도 상향" }]);
+      if (fittPick >= cols.length) fittPick = 0;
+      const [nm, fg, c] = cols[fittPick];
+      const ph = [["init", "1~4주", "강도 하단 · 하루 20~30분"], ["imp", "5~12주", "시간 → 강도 상향" + (d.fBP ? " · 등척성 추가" : "")], ["main", "13주+", "목표량 유지 · 재측정"]];
+      return '<div class="scr fade rise"><h2>FITT-VP 처방</h2><div class="fittsel">' + cols.map((x, i) => '<button data-fitt="' + i + '" aria-pressed="' + (i === fittPick) + '">' + esc(x[0]) + "</button>").join("") + "</div>" +
+        '<div class="card ink"><div class="fhead">' + FIG.svg(fg) + '<div><div class="kicker">' + esc(nm) + ' 운동</div><div class="ttl">' + esc(c.Ty) + '</div><p class="note">' + esc(FIG.cue(fg)) + "</p></div></div>" +
+        [["F", "빈도", c.F], ["I", "강도", c.I], ["T", "시간", c.T], ["T", "형태", c.Ty], ["V", "운동량", c.V], ["P", "진행", c.P]].map((r) => '<div class="fittrow"><b>' + r[0] + '</b><span class="k">' + r[1] + "</span><span>" + esc(r[2]) + "</span></div>").join("") + "</div>" +
+        '<div class="card"><h3>' + ic("plan") + '진행 단계 · 눌러서 바꾸기</h3><div class="phases">' + ph.map((p) => '<button type="button" class="phasebtn" data-phase="' + p[0] + '" aria-pressed="' + (p[0] === d.phase) + '"><b>' + p[1] + "</b><small>" + esc(p[2]) + "</small></button>").join("") + "</div></div></div>";
+    }
+    if (tab === "plan") {
+      const w = R.week[dayPick];
+      const pct = Math.min(100, R.total / R.aeroTarget * 100), ok = R.total >= R.aeroTarget;
+      return '<div class="scr fade rise"><h2>일주일 운동 계획</h2>' +
+        '<div class="goal' + (ok ? " ok" : "") + '"><div class="row"><span>주간 유산소 <b data-count="' + R.total + '">' + R.total + "</b>분 / 목표 " + R.aeroTarget + "분</span><span>" + (ok ? "충족" : (R.aeroTarget - R.total) + "분 부족") + '</span></div><div class="trk"><i data-w="' + pct + '"></i></div>' +
+        (ok ? "" : '<p class="note">하루 시간을 늘리거나, 출퇴근 걷기처럼 짧게 나눠 채우세요.</p>') + (d.phase === "init" && !d.regular ? '<p class="note">초기 단계 목표는 주 120분이며, 향상 단계에서 150분 이상으로 늘립니다.</p>' : "") + "</div>" +
+        '<div class="days">' + NAMES.map((n, i) => { const x = R.week[i]; return '<button class="daychip" data-day="' + i + '" aria-pressed="' + (i === dayPick) + '"' + (x.rest ? " disabled" : "") + ">" + n + "<small>" + (x.rest ? "휴식" : x.isRes ? "유+근" : "유산소") + "</small></button>"; }).join("") + "</div>" +
+        '<div class="card ink"><h3>' + NAMES[dayPick] + "요일 · " + w.items.reduce((a, it) => a + it.min, 0) + "분</h3>" + stackBar(w.items) +
+        '<div>' + w.items.map((it) => '<div class="tl"><div class="m">' + it.min + "분</div><div><b>" + esc(it.name) + "</b><small>" + esc(it.sub) + "</small></div></div>").join("") + "</div></div>" +
+        (w.isRes ? '<div class="card"><h3>' + ic("str") + "오늘의 저항운동 · " + esc(R.ex.tool) + "</h3>" + R.ex.L.map((e, i) => '<div class="ex">' + FIG.svg(e.fig, "", i * 0.13) + '<div><div class="top"><b>' + esc(e.name) + '</b><span class="dose">' + (e.core ? "좌우 8~10회 × 2" : esc(R.ds.reps + " × " + R.ds.sets)) + "</span></div><small>" + esc(FIG.cue(e.fig)) + "</small>" + (e.why ? '<small class="why">' + esc(e.why) + "</small>" : "") + "</div></div>").join("") +
+          '<p class="note">무게: ' + esc(R.ds.load) + (R.ex.skipped ? " · " + esc(R.ex.skipped) : "") + "</p></div>" : '<p class="note">저항운동이 있는 요일(유+근)을 누르면 동작 그림이 나옵니다.</p>') + "</div>";
+    }
+    const C = [];
+    C.push(["stop", "운동을 멈춰야 할 신호", ["가슴 통증·압박감", "평소보다 심한 숨참", "어지럼증·식은땀", "관절의 날카로운 통증"], true]);
+    const hc = [];
+    if (d.fBP) hc.push("운동 전 혈압 측정, 200/110mmHg를 넘으면 그날은 쉬기", "정리운동 10분 이상으로 혈압 급강하 대비", "무게를 올릴 때 내쉬고 내릴 때 들이쉬기 (숨 참기 금지)");
+    if (d.bb) hc.push("베타차단제로 심박수가 덜 오르니 RPE로 강도 판단");
+    if (d.hypo) hc.push("운동 전후 혈당 측정, 100mg/dL 미만이면 간식 먼저", "사탕·주스 등 빠른 당 소지");
+    if (d.fGLU) hc.push("식후 1~2시간 사이 운동이 혈당 조절에 유리");
+    if (d.fWT) hc.push("체중보다 허리둘레 변화를 먼저 확인");
+    if (d.older) hc.push("손잡이·벽 근처에서 균형운동");
+    if (d.wantVig && !d.regular) hc.push("최근 운동하지 않았다면 고강도는 4주 이후로 미루기");
+    const pc = [];
+    if (d.pain.includes("knee")) pc.push("통증 없는 범위까지만 굽히기", "계단 내려가기·점프 피하기", "통증이 다음 날까지 남으면 강도 낮추기");
+    if (d.pain.includes("back")) pc.push("허리를 둥글게 말아 드는 동작 피하기", "오래 앉아 있었다면 걷기로 먼저 풀기");
+    if (d.pain.includes("shoulder")) pc.push("팔은 어깨 높이까지만, 머리 위로 미는 동작 제외");
+    const ec = [];
+    if (d.place === "outdoor") ec.push("평평하고 밝은 길, 쿠션 있는 운동화");
+    if (d.season === "summer") ec.push("한낮을 피하고 15~20분마다 물 마시기", "더운 날엔 같은 RPE라도 속도 낮추기");
+    if (d.season === "winter") ec.push("실내에서 준비운동을 길게 한 뒤 나가기 (추위에 혈압 상승)", "얇은 옷을 겹쳐 입기");
+    if (d.place === "pool") ec.push("물에서 나올 때 천천히 일어나기", "물속에선 심박수가 낮게 나와 RPE 기준");
+    if (d.place === "home") ec.push("미끄럽지 않은 바닥·매트, 주변 가구 정리");
+    if (["gym", "apt"].includes(d.place)) ec.push("머신 좌석·손잡이 위치 먼저 맞추기", "트레드밀 안전 클립 착용, 손잡이에 기대지 않기");
+    if (d.tod === "am") ec.push("아침엔 몸이 굳어 있어 준비운동을 길게");
+    const groups = [C[0], hc.length && ["heart", "건강 상태별", hc], pc.length && ["joint", "불편한 부위", pc], ec.length && ["sun", "운동 환경", ec]].filter(Boolean);
+    return '<div class="scr fade rise"><h2>유의사항</h2>' + groups.map((g) => '<div class="card cgroup' + (g[3] ? " stop" : "") + '"><h3>' + ic(g[0]) + esc(g[1]) + "</h3><ul>" + g[2].map((x) => "<li>" + esc(x) + "</li>").join("") + "</ul></div>").join("") + "</div>";
+  }
+
+  render();
+})();
+</script>
